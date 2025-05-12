@@ -4,6 +4,8 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <!-- Add Chart.js for better PDF rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -85,19 +87,28 @@
         color: white;
       }
       
-      /* Hidden fields for Jotform submission */
-      .hidden-fields {
-        display: none;
+      /* Chart Container Styles */
+      .chart-container {
+        margin-top: 25px;
+        padding-top: 15px;
+        border-top: 1px solid #ddd;
+      }
+      
+      .chart-wrapper {
+        position: relative;
+        height: 200px;
+        width: 100%;
+        margin-top: 15px;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h3>Details</h3>
+      <h3>Materials Usage Table</h3>
       
       <!-- Information Message -->
       <div class="info-message">
-        Note: For optimal PDF display, use the "Input Table" element in the Jotform PDF Editor and map it to these fields.
+        This table shows which materials are used at each location. Check the boxes to indicate where each material is used.
       </div>
       
       <!-- Dynamic Table Container -->
@@ -105,8 +116,13 @@
         <div class="no-selections-message">Select at least one option to generate the table</div>
       </div>
       
-      <!-- Hidden Input Fields - These will be used to pass data to Jotform -->
-      <div id="hidden-fields" class="hidden-fields"></div>
+      <!-- Chart for better PDF rendering -->
+      <div class="chart-container">
+        <h4>Visual Table (for PDF export)</h4>
+        <div class="chart-wrapper">
+          <canvas id="tableChart"></canvas>
+        </div>
+      </div>
     </div>
     
     <script>
@@ -122,6 +138,9 @@
       
       // Store values in the dynamic table (3D object: row > column > checked state)
       var tableValues = {};
+      
+      // Variables for Chart.js
+      var tableChart = null;
       
       // Initialize table values
       function initTableValues() {
@@ -151,8 +170,14 @@
         // If no options are selected, show message
         if (selectedOptions.length === 0) {
           tableArea.innerHTML = '<div class="no-selections-message">Select at least one option to generate the table</div>';
+          
+          // Hide chart area
+          document.querySelector('.chart-container').style.display = 'none';
           return;
         }
+        
+        // Show chart area
+        document.querySelector('.chart-container').style.display = 'block';
         
         // Build the table
         var tableHTML = '<table id="selectionTable" class="dynamic-table">';
@@ -185,29 +210,93 @@
         tableHTML += '</table>';
         tableArea.innerHTML = tableHTML;
         
-        // Update hidden fields for better PDF support
-        updateHiddenFields(selectedOptions);
+        // Update the chart
+        updateTableChart(selectedOptions);
       }
       
-      // Update hidden fields that will be used for PDF mapping
-      function updateHiddenFields(selectedOptions) {
-        var hiddenFieldsContainer = document.getElementById("hidden-fields");
-        hiddenFieldsContainer.innerHTML = '';
+      // Create/update the chart that visualizes the table
+      function updateTableChart(selectedOptions) {
+        if (selectedOptions.length === 0) return;
         
-        // Create hidden fields for each cell in the table
-        tableRows.forEach(function(row) {
-          selectedOptions.forEach(function(option) {
-            var fieldId = row + '_' + option;
-            var fieldValue = tableValues[row][option] === 1 ? 'Yes' : 'No';
-            
-            var hiddenField = document.createElement('input');
-            hiddenField.type = 'hidden';
-            hiddenField.id = fieldId;
-            hiddenField.name = fieldId;
-            hiddenField.value = fieldValue;
-            
-            hiddenFieldsContainer.appendChild(hiddenField);
+        var ctx = document.getElementById('tableChart').getContext('2d');
+        
+        // Prepare data for chart
+        var datasets = [];
+        var colorMap = {
+          'Yes': 'rgba(75, 192, 192, 0.8)',
+          'No': 'rgba(201, 203, 207, 0.4)'
+        };
+        
+        // Create one dataset per material type
+        selectedOptions.forEach(function(option, index) {
+          var data = [];
+          tableRows.forEach(function(row) {
+            var value = tableValues[row][option] === 1 ? 1 : 0;
+            data.push(value);
           });
+          
+          datasets.push({
+            label: option,
+            data: data,
+            backgroundColor: colorMap['Yes'],
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          });
+        });
+        
+        // Destroy previous chart if it exists
+        if (tableChart) {
+          tableChart.destroy();
+        }
+        
+        // Create new chart
+        tableChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: tableRows,
+            datasets: datasets
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                stacked: false,
+                beginAtZero: true,
+                max: 1,
+                ticks: {
+                  stepSize: 1,
+                  callback: function(value) {
+                    return value === 0 ? 'No' : 'Yes';
+                  }
+                }
+              },
+              y: {
+                stacked: false
+              }
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: 'Materials Used by Location',
+                font: {
+                  size: 16
+                }
+              },
+              legend: {
+                position: 'top',
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const value = context.parsed.x;
+                    return context.dataset.label + ': ' + (value === 1 ? 'Yes' : 'No');
+                  }
+                }
+              }
+            }
+          }
         });
       }
       
@@ -233,6 +322,54 @@
         updateDynamicTable();
       }
       
+      // Create a formatted text representation of the table
+      function createFormattedTable() {
+        var selectedOptions = [];
+        
+        // Get selected options
+        for (var option in checkboxState) {
+          if (checkboxState[option] === 1) {
+            selectedOptions.push(option);
+          }
+        }
+        
+        if (selectedOptions.length === 0) {
+          return "No materials selected";
+        }
+        
+        // Create a formatted representation of the table
+        var output = "MATERIALS USAGE TABLE:\n\n";
+        
+        // Create a header row with proper spacing
+        output += "Location    ";
+        selectedOptions.forEach(function(option) {
+          output += option + "    ";
+        });
+        output += "\n";
+        
+        // Add a separator line
+        output += "----------  ";
+        selectedOptions.forEach(function(option) {
+          var dashes = "-".repeat(option.length);
+          output += dashes + "    ";
+        });
+        output += "\n";
+        
+        // Add data rows
+        tableRows.forEach(function(row) {
+          output += row.padEnd(12);
+          
+          selectedOptions.forEach(function(option) {
+            var symbol = tableValues[row][option] === 1 ? "YES" : "NO";
+            output += symbol.padEnd(option.length + 4);
+          });
+          
+          output += "\n";
+        });
+        
+        return output;
+      }
+      
       // Initialize the widget
       JFCustomWidget.subscribe("ready", function() {
         // Set up listeners for each individual checkbox
@@ -255,44 +392,28 @@
         });
       });
       
-      // Create a structured data object for submission
-      function createStructuredData() {
-        var result = {
-          tableData: {},
-          hiddenFields: {}
-        };
+      // Handle form submission
+      JFCustomWidget.subscribe("submit", function() {
+        // Get a representation of the table, including the chart as an image if possible
+        var formattedTable = createFormattedTable();
         
-        // Get selected options
-        var selectedOptions = [];
-        for (var option in checkboxState) {
-          if (checkboxState[option] === 1) {
-            selectedOptions.push(option);
+        // Include the chart canvas as a data URL if available
+        var chartImage = null;
+        if (tableChart) {
+          try {
+            chartImage = document.getElementById('tableChart').toDataURL('image/png');
+          } catch (e) {
+            // If we can't get the chart image, just use the text table
           }
         }
         
-        // Add table data
-        tableRows.forEach(function(row) {
-          result.tableData[row] = {};
-          selectedOptions.forEach(function(option) {
-            var value = tableValues[row][option] === 1 ? 'Yes' : 'No';
-            result.tableData[row][option] = value;
-            
-            // Also add to hidden fields in a format good for PDF mapping
-            var fieldId = row + '_' + option;
-            result.hiddenFields[fieldId] = value;
-          });
-        });
-        
-        return result;
-      }
-      
-      // Handle form submission
-      JFCustomWidget.subscribe("submit", function() {
-        var data = createStructuredData();
-        
+        // Submit data to Jotform
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: JSON.stringify(data)
+          value: JSON.stringify({
+            tableText: formattedTable,
+            chartImage: chartImage
+          })
         });
       });
     </script>
