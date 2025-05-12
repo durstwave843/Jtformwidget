@@ -2,45 +2,138 @@
 <html>
   <head>
     <meta charset="utf-8"/>
-
-    <!-- 1) Load the Widget API -->
+    <!-- Load the Widget API -->
     <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
-
     <script>
       console.log("🏁 widget HTML loaded");
-
-      JFCustomWidget.subscribe("ready", () => {
+      
+      // Initialize the widget when ready
+      JFCustomWidget.subscribe("ready", function() {
         console.log("🔔 widget ready fired");
-
-        // show that we're alive
-        document.getElementById("status").textContent = "Working";
-
-        // ---- 1️⃣ Try the official listener ----
-        // Make sure this name matches exactly your question's Unique Name
-        const fieldName = "typeA";  
-        JFCustomWidget.listenFromField(fieldName, "change", (value) => {
-          console.log("✅ listenFromField:", value);
+        document.getElementById("status").textContent = "Connected to JotForm";
+        
+        // Get the widget's configuration data
+        var widgetData = JFCustomWidget.getWidgetSettings();
+        console.log("Widget settings:", widgetData);
+        
+        // Get field question ID from URL parameters
+        var urlParams = new URLSearchParams(window.location.search);
+        var qid = urlParams.get('qid');
+        console.log("Question ID from URL:", qid);
+        
+        // Store the field names to try
+        var possibleFieldNames = [
+          "typeA",                // Original field name
+          "q" + qid + "_typeA",   // Field with question ID prefix
+          "input_" + qid          // Input with just the question ID
+        ];
+        
+        console.log("Will try these field names:", possibleFieldNames);
+        
+        // Get form data to find field IDs
+        JFCustomWidget.getFormData(function(formData) {
+          if (formData && formData.formID) {
+            console.log("Form ID:", formData.formID);
+            
+            // Try to get all questions on the form
+            possibleFieldNames.forEach(function(fieldName) {
+              console.log("Trying to listen to field:", fieldName);
+              
+              // Method 1: Field value listener
+              JFCustomWidget.listenFromField(fieldName, "change", function(value) {
+                console.log("✅ Change detected on " + fieldName + ":", value);
+                updateStatus("Value from " + fieldName + ": " + JSON.stringify(value));
+              });
+            });
+          }
         });
-
-        // ---- 2️⃣ Fallback: Poll every second ----
-        setInterval(() => {
-          JFCustomWidget.getFieldsValueByName(fieldName, (vals) => {
-            console.log("⏱ polling getFieldsValueByName:", vals);
+        
+        // Method 2: Listen for global form value changes
+        JFCustomWidget.subscribe("formValueChanged", function(data) {
+          console.log("📊 Form value changed event:", data);
+          if (data && data.fieldID) {
+            updateStatus("Form value changed for field " + data.fieldID + ": " + JSON.stringify(data.value));
+          }
+        });
+        
+        // Method 3: Improved polling with proper error handling
+        var pollCounter = 0;
+        var maxPolls = 15; // Stop after 15 attempts
+        
+        var pollInterval = setInterval(function() {
+          pollCounter++;
+          if (pollCounter > maxPolls) {
+            clearInterval(pollInterval);
+            console.log("Polling stopped after " + maxPolls + " attempts");
+            return;
+          }
+          
+          console.log("Poll attempt #" + pollCounter);
+          
+          // Try to get ALL form values instead of specific ones
+          JFCustomWidget.getAllFormValues(function(response) {
+            console.log("📑 All form values:", response);
+            
+            // Check if we have a valid response structure
+            if (response && response.data && Array.isArray(response.data)) {
+              // Empty array is expected initially when nothing is selected
+              document.getElementById("allValues").textContent = 
+                "All form values: " + JSON.stringify(response.data);
+            } else if (response && response.data) {
+              // Sometimes it returns an object instead of array
+              document.getElementById("allValues").textContent = 
+                "Form values object: " + JSON.stringify(response.data);
+            }
           });
-        }, 1000);
+        }, 2000);
       });
-
-      JFCustomWidget.subscribe("submit", () => {
+      
+      // Handle form submission
+      JFCustomWidget.subscribe("submit", function() {
         console.log("🔔 widget submit fired");
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: ""
+          value: document.getElementById("fieldStatus").textContent || "No selection"
         });
       });
+      
+      // Helper function to update status
+      function updateStatus(message) {
+        document.getElementById("fieldStatus").innerHTML = message;
+        document.getElementById("fieldStatus").style.display = "block";
+      }
     </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 12px;
+        margin: 0;
+      }
+      #status {
+        padding: 8px;
+        background-color: #f0f0f0;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+      #fieldStatus, #allValues {
+        padding: 8px;
+        background-color: #e6f7ff;
+        border-left: 4px solid #1890ff;
+        margin: 10px 0;
+        word-break: break-all;
+        display: none;
+      }
+      .note {
+        font-size: 12px;
+        color: #666;
+        margin-top: 12px;
+      }
+    </style>
   </head>
-
-  <body style="font-family: sans-serif; padding: 12px;">
+  <body>
     <div id="status">Loading…</div>
+    <div id="fieldStatus" style="display:none;"></div>
+    <div id="allValues" style="display:none;"></div>
+    <div class="note">This widget is monitoring field changes. Check your browser console (F12) for detailed logs.</div>
   </body>
 </html>
