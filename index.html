@@ -6,152 +6,212 @@
     <style>
       body {
         font-family: Arial, sans-serif;
-        padding: 10px;
+        padding: 15px;
+        background-color: #f9f9f9;
         margin: 0;
-        background-color: #f8f8f8;
       }
       
-      .card {
+      .container {
         background: white;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         padding: 15px;
+        margin-bottom: 15px;
       }
       
       h3 {
         margin-top: 0;
         color: #333;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
       }
       
       .value-display {
-        font-family: monospace;
-        background: #f0f0f0;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
         padding: 10px;
         border-radius: 4px;
-        margin-top: 10px;
+        font-family: monospace;
+        margin: 10px 0;
         min-height: 20px;
       }
       
-      .empty {
-        color: #999;
-        font-style: italic;
+      .buttons {
+        margin-top: 15px;
       }
       
-      .button {
+      button {
         background: #4CAF50;
-        border: none;
         color: white;
-        padding: 8px 16px;
+        border: none;
+        padding: 8px 15px;
         border-radius: 4px;
         cursor: pointer;
-        margin-top: 10px;
+        margin-right: 10px;
       }
       
-      .button:hover {
+      button:hover {
         background: #45a049;
+      }
+      
+      .log {
+        max-height: 200px;
+        overflow-y: auto;
+        font-size: 12px;
+      }
+      
+      .status {
+        font-weight: bold;
+        color: #4CAF50;
       }
     </style>
   </head>
   <body>
-    <div class="card">
-      <h3>Simple Form Field Monitor</h3>
-      <p>Current status: <strong id="status">Connecting...</strong></p>
-      <p>This widget will display any changes to selected form fields.</p>
+    <div class="container">
+      <h3>Form Field Monitor</h3>
+      <p>Status: <span id="status" class="status">Connecting...</span></p>
+      
+      <div>
+        <strong>Checkbox Field Values:</strong>
+        <div id="checkbox-values" class="value-display">No values yet</div>
+      </div>
+      
+      <div>
+        <strong>Text Field Value:</strong>
+        <div id="text-value" class="value-display">No value yet</div>
+      </div>
+      
+      <div class="buttons">
+        <button id="btn-probe">Probe Form Fields</button>
+        <button id="btn-write">Write to Text Field</button>
+      </div>
     </div>
     
-    <div class="card">
-      <h3>Checkbox Field (q3_typeA)</h3>
-      <div id="checkbox-value" class="value-display empty">No value yet</div>
-    </div>
-    
-    <div class="card">
-      <h3>Text Field (q10_typeA10)</h3>
-      <div id="text-value" class="value-display empty">No value yet</div>
-    </div>
-    
-    <div class="card">
-      <h3>Manual Check</h3>
-      <button id="check-button" class="button">Check Field Values Now</button>
-      <div id="manual-check" class="value-display empty">Click button to check</div>
+    <div class="container">
+      <h3>Debug Log</h3>
+      <div id="log" class="value-display log"></div>
     </div>
     
     <script>
-      // Simple helper to update value displays
-      function updateValue(elementId, value) {
-        var element = document.getElementById(elementId);
+      // Helper to update display
+      function updateDisplay(id, value) {
+        document.getElementById(id).innerHTML = value;
+      }
+      
+      // Helper to log messages
+      function log(message) {
+        var logElement = document.getElementById('log');
+        var time = new Date().toTimeString().split(' ')[0];
         
-        if (value === undefined || value === null || value === "") {
-          element.innerHTML = "No value";
-          element.className = "value-display empty";
-        } else {
-          if (typeof value === 'object') {
-            element.innerHTML = JSON.stringify(value);
-          } else {
-            element.innerHTML = value;
-          }
-          element.className = "value-display";
+        if (typeof message === 'object') {
+          message = JSON.stringify(message);
         }
+        
+        logElement.innerHTML = time + ': ' + message + '<br>' + logElement.innerHTML;
       }
       
       // Initialize widget
-      document.getElementById('status').textContent = "Initializing...";
+      log('Widget loading...');
       
-      // Watch for ready event
-      JFCustomWidget.subscribe("ready", function() {
-        document.getElementById('status').textContent = "Connected";
+      // Method to check field values in multiple ways
+      function probeFields() {
+        log('Probing fields with multiple methods...');
         
-        // Watch for form value changes for the checkbox field
-        JFCustomWidget.subscribe("formValueChanged", function(data) {
+        // First method: Try getting field values by name
+        JFCustomWidget.getFieldsValueByName(['q3_typeA', 'q10_typeA10'], function(response) {
+          log('getFieldsValueByName response:');
+          log(response);
+        });
+        
+        // Second method: Try getting field values by ID
+        JFCustomWidget.getFieldsValueById([3, 10], function(response) {
+          log('getFieldsValueById response:');
+          log(response);
+        });
+        
+        // Third method: Listen directly to the fields by multiple name formats
+        var possibleNames = ['q3_typeA', 'q3_typeA[]', 'input_3_0', 'input_3_1', 'input_3_2'];
+        
+        possibleNames.forEach(function(name) {
+          log('Setting up listener for ' + name);
+          
+          JFCustomWidget.listenFromField(name, 'change', function(value) {
+            log('Change event from ' + name + ':');
+            log(value);
+            updateDisplay('checkbox-values', JSON.stringify(value));
+          });
+        });
+        
+        // Listen to text field by multiple formats
+        var textFieldNames = ['q10_typeA10', 'input_10'];
+        
+        textFieldNames.forEach(function(name) {
+          log('Setting up listener for ' + name);
+          
+          JFCustomWidget.listenFromField(name, 'change', function(value) {
+            log('Change event from ' + name + ':');
+            log(value);
+            updateDisplay('text-value', value);
+          });
+        });
+      }
+      
+      // Method to write to the text field
+      function writeToTextField() {
+        var testValue = "Test value from widget: " + new Date().toLocaleTimeString();
+        log('Attempting to write to text field: ' + testValue);
+        
+        // Try to set the value directly
+        JFCustomWidget.storeToField('q10_typeA10', testValue, function(response) {
+          log('storeToField response:');
+          log(response);
+        });
+        
+        // Alternative method
+        JFCustomWidget.setFieldsValueById(10, testValue, function(response) {
+          log('setFieldsValueById response:');
+          log(response);
+        });
+      }
+      
+      // Wait for the JotForm API to be ready
+      JFCustomWidget.subscribe('ready', function() {
+        log('Ready event received!');
+        updateDisplay('status', 'Connected to JotForm');
+        
+        // Set up button event handlers
+        document.getElementById('btn-probe').addEventListener('click', probeFields);
+        document.getElementById('btn-write').addEventListener('click', writeToTextField);
+        
+        // Subscribe to form value changes
+        JFCustomWidget.subscribe('formValueChanged', function(data) {
+          log('Form value changed:');
+          log(data);
+          
           if (data && data.fieldID) {
-            // Check if it's our checkbox field
-            if (data.fieldID.indexOf("q3_typeA") !== -1) {
-              updateValue("checkbox-value", data.value);
+            // Check if it's the checkbox field
+            if (data.fieldID.indexOf('q3_typeA') !== -1) {
+              updateDisplay('checkbox-values', JSON.stringify(data.value));
             }
             
-            // Check if it's our text field
-            if (data.fieldID.indexOf("q10_typeA10") !== -1 || 
-                data.fieldID.indexOf("input_10") !== -1) {
-              updateValue("text-value", data.value);
+            // Check if it's the text field
+            if (data.fieldID.indexOf('q10_typeA10') !== -1 || 
+                data.fieldID.indexOf('input_10') !== -1) {
+              updateDisplay('text-value', data.value);
             }
           }
         });
         
-        // Setup manual check button
-        document.getElementById("check-button").addEventListener("click", function() {
-          updateValue("manual-check", "Checking...");
-          
-          // Check checkbox field
-          JFCustomWidget.getFieldsValueByName(["q3_typeA"], function(response) {
-            var value = "";
-            
-            if (response && response.data) {
-              value = response.data;
-            }
-            
-            updateValue("checkbox-value", value);
-          });
-          
-          // Check text field
-          JFCustomWidget.getFieldsValueByName(["q10_typeA10"], function(response) {
-            var value = "";
-            
-            if (response && response.data) {
-              value = response.data;
-            }
-            
-            updateValue("text-value", value);
-          });
-          
-          updateValue("manual-check", "Check completed");
-        });
+        // Run the probe once after initialization
+        setTimeout(probeFields, 1000);
       });
       
       // Handle form submission
-      JFCustomWidget.subscribe("submit", function() {
+      JFCustomWidget.subscribe('submit', function() {
+        log('Submit event received');
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: "Form submitted"
+          value: document.getElementById('text-value').innerHTML
         });
       });
     </script>
