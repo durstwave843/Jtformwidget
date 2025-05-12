@@ -100,6 +100,44 @@
         width: 100%;
         margin-top: 15px;
       }
+      
+      /* Visual Table Styles (Chart.js Table Simulation) */
+      .visual-table {
+        width: 100%;
+        margin-top: 20px;
+        border-collapse: collapse;
+      }
+      
+      .visual-table th, .visual-table td {
+        border: 2px solid #333;
+        padding: 8px;
+        text-align: center;
+      }
+      
+      .visual-table th {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+      }
+      
+      .visual-table td {
+        font-weight: bold;
+      }
+      
+      .visual-table tr td:first-child {
+        background-color: #f0f0f0;
+        text-align: left;
+      }
+      
+      .cell-yes {
+        background-color: #e6ffe6;
+        color: #006600;
+      }
+      
+      .cell-no {
+        background-color: #fff0f0;
+        color: #cc0000;
+      }
     </style>
   </head>
   <body>
@@ -116,12 +154,9 @@
         <div class="no-selections-message">Select at least one option to generate the table</div>
       </div>
       
-      <!-- Chart for better PDF rendering -->
-      <div class="chart-container">
-        <h4>Visual Table (for PDF export)</h4>
-        <div class="chart-wrapper">
-          <canvas id="tableChart"></canvas>
-        </div>
+      <!-- Visual Table for PDF Export -->
+      <div id="visual-table-area" style="display: none;">
+        <!-- This will contain a HTML table that mimics a chart -->
       </div>
     </div>
     
@@ -139,9 +174,6 @@
       // Store values in the dynamic table (3D object: row > column > checked state)
       var tableValues = {};
       
-      // Variables for Chart.js
-      var tableChart = null;
-      
       // Initialize table values
       function initTableValues() {
         tableRows.forEach(function(row) {
@@ -158,6 +190,7 @@
       // Update the dynamic table
       function updateDynamicTable() {
         var tableArea = document.getElementById("dynamic-table-area");
+        var visualTableArea = document.getElementById("visual-table-area");
         var selectedOptions = [];
         
         // Get selected options
@@ -167,19 +200,17 @@
           }
         }
         
-        // If no options are selected, show message
+        // If no options are selected, show message and hide visual table
         if (selectedOptions.length === 0) {
           tableArea.innerHTML = '<div class="no-selections-message">Select at least one option to generate the table</div>';
-          
-          // Hide chart area
-          document.querySelector('.chart-container').style.display = 'none';
+          visualTableArea.style.display = 'none';
           return;
         }
         
-        // Show chart area
-        document.querySelector('.chart-container').style.display = 'block';
+        // Show visual table
+        visualTableArea.style.display = 'block';
         
-        // Build the table
+        // Build the interactive table
         var tableHTML = '<table id="selectionTable" class="dynamic-table">';
         
         // Table header
@@ -210,94 +241,44 @@
         tableHTML += '</table>';
         tableArea.innerHTML = tableHTML;
         
-        // Update the chart
-        updateTableChart(selectedOptions);
+        // Update the visual table (renders as HTML instead of canvas for better PDF export)
+        updateVisualTable(selectedOptions);
       }
       
-      // Create/update the chart that visualizes the table
-      function updateTableChart(selectedOptions) {
+      // Create a visual table that will render well in PDFs
+      function updateVisualTable(selectedOptions) {
         if (selectedOptions.length === 0) return;
         
-        var ctx = document.getElementById('tableChart').getContext('2d');
+        var visualTableArea = document.getElementById("visual-table-area");
         
-        // Prepare data for chart
-        var datasets = [];
-        var colorMap = {
-          'Yes': 'rgba(75, 192, 192, 0.8)',
-          'No': 'rgba(201, 203, 207, 0.4)'
-        };
+        // Create a visually distinct HTML table that mimics a chart
+        var tableHTML = '<h4>Materials Usage Chart (PDF Version)</h4>';
+        tableHTML += '<table class="visual-table">';
         
-        // Create one dataset per material type
-        selectedOptions.forEach(function(option, index) {
-          var data = [];
-          tableRows.forEach(function(row) {
-            var value = tableValues[row][option] === 1 ? 1 : 0;
-            data.push(value);
+        // Table header
+        tableHTML += '<tr><th>Location</th>';
+        selectedOptions.forEach(function(option) {
+          tableHTML += '<th>' + option + '</th>';
+        });
+        tableHTML += '</tr>';
+        
+        // Table rows with colored cells
+        tableRows.forEach(function(row) {
+          tableHTML += '<tr><td>' + row + '</td>';
+          
+          selectedOptions.forEach(function(option) {
+            var isChecked = tableValues[row][option] === 1;
+            var cellClass = isChecked ? "cell-yes" : "cell-no";
+            var value = isChecked ? "YES" : "NO";
+            
+            tableHTML += '<td class="' + cellClass + '">' + value + '</td>';
           });
           
-          datasets.push({
-            label: option,
-            data: data,
-            backgroundColor: colorMap['Yes'],
-            borderColor: 'rgba(75, 192, 192, 1)',
-            borderWidth: 1
-          });
+          tableHTML += '</tr>';
         });
         
-        // Destroy previous chart if it exists
-        if (tableChart) {
-          tableChart.destroy();
-        }
-        
-        // Create new chart
-        tableChart = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: tableRows,
-            datasets: datasets
-          },
-          options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                stacked: false,
-                beginAtZero: true,
-                max: 1,
-                ticks: {
-                  stepSize: 1,
-                  callback: function(value) {
-                    return value === 0 ? 'No' : 'Yes';
-                  }
-                }
-              },
-              y: {
-                stacked: false
-              }
-            },
-            plugins: {
-              title: {
-                display: true,
-                text: 'Materials Used by Location',
-                font: {
-                  size: 16
-                }
-              },
-              legend: {
-                position: 'top',
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const value = context.parsed.x;
-                    return context.dataset.label + ': ' + (value === 1 ? 'Yes' : 'No');
-                  }
-                }
-              }
-            }
-          }
-        });
+        tableHTML += '</table>';
+        visualTableArea.innerHTML = tableHTML;
       }
       
       // Toggle cell checkbox in the table
@@ -322,8 +303,8 @@
         updateDynamicTable();
       }
       
-      // Create a formatted text representation of the table
-      function createFormattedTable() {
+      // Create a formatted text representation of the table with HTML for better PDF rendering
+      function createHTMLTable() {
         var selectedOptions = [];
         
         // Get selected options
@@ -334,40 +315,39 @@
         }
         
         if (selectedOptions.length === 0) {
-          return "No materials selected";
+          return "<p>No materials selected</p>";
         }
         
-        // Create a formatted representation of the table
-        var output = "MATERIALS USAGE TABLE:\n\n";
+        // Create an HTML table for better PDF rendering
+        var htmlOutput = '<h3>Materials Usage Table</h3>';
+        htmlOutput += '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">';
         
-        // Create a header row with proper spacing
-        output += "Location    ";
+        // Table header
+        htmlOutput += '<tr style="background-color: #4CAF50; color: white;"><th>Location</th>';
         selectedOptions.forEach(function(option) {
-          output += option + "    ";
+          htmlOutput += '<th>' + option + '</th>';
         });
-        output += "\n";
+        htmlOutput += '</tr>';
         
-        // Add a separator line
-        output += "----------  ";
-        selectedOptions.forEach(function(option) {
-          var dashes = "-".repeat(option.length);
-          output += dashes + "    ";
-        });
-        output += "\n";
-        
-        // Add data rows
-        tableRows.forEach(function(row) {
-          output += row.padEnd(12);
+        // Table rows with colors
+        tableRows.forEach(function(row, index) {
+          var rowColor = index % 2 === 0 ? '#f2f2f2' : 'white';
+          htmlOutput += '<tr style="background-color: ' + rowColor + ';"><td><strong>' + row + '</strong></td>';
           
           selectedOptions.forEach(function(option) {
-            var symbol = tableValues[row][option] === 1 ? "YES" : "NO";
-            output += symbol.padEnd(option.length + 4);
+            var isChecked = tableValues[row][option] === 1;
+            var cellColor = isChecked ? '#e6ffe6' : '#fff0f0';
+            var textColor = isChecked ? '#006600' : '#cc0000';
+            var value = isChecked ? "YES" : "NO";
+            
+            htmlOutput += '<td style="background-color: ' + cellColor + '; color: ' + textColor + '; text-align: center;"><strong>' + value + '</strong></td>';
           });
           
-          output += "\n";
+          htmlOutput += '</tr>';
         });
         
-        return output;
+        htmlOutput += '</table>';
+        return htmlOutput;
       }
       
       // Initialize the widget
@@ -394,26 +374,13 @@
       
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
-        // Get a representation of the table, including the chart as an image if possible
-        var formattedTable = createFormattedTable();
+        // Get an HTML representation of the table for better PDF rendering
+        var htmlTable = createHTMLTable();
         
-        // Include the chart canvas as a data URL if available
-        var chartImage = null;
-        if (tableChart) {
-          try {
-            chartImage = document.getElementById('tableChart').toDataURL('image/png');
-          } catch (e) {
-            // If we can't get the chart image, just use the text table
-          }
-        }
-        
-        // Submit data to Jotform
+        // Submit the HTML table to Jotform
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: JSON.stringify({
-            tableText: formattedTable,
-            chartImage: chartImage
-          })
+          value: htmlTable
         });
       });
     </script>
