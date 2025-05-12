@@ -21,71 +21,127 @@
         var qid = urlParams.get('qid');
         console.log("Question ID from URL:", qid);
         
-        // Store the field names to try
-        var possibleFieldNames = [
-          "typeA",                // Original field name
-          "q" + qid + "_typeA",   // Field with question ID prefix
-          "input_" + qid          // Input with just the question ID
-        ];
-        
-        console.log("Will try these field names:", possibleFieldNames);
-        
-        // Get form data to find field IDs
-        JFCustomWidget.getFormData(function(formData) {
-          if (formData && formData.formID) {
-            console.log("Form ID:", formData.formID);
-            
-            // Try to get all questions on the form
-            possibleFieldNames.forEach(function(fieldName) {
-              console.log("Trying to listen to field:", fieldName);
-              
-              // Method 1: Field value listener
-              JFCustomWidget.listenFromField(fieldName, "change", function(value) {
-                console.log("✅ Change detected on " + fieldName + ":", value);
-                updateStatus("Value from " + fieldName + ": " + JSON.stringify(value));
-              });
-            });
+        // Special handling required for checkbox groups
+        // We need to monitor the entire form values
+        JFCustomWidget.subscribe("formData", function(formData) {
+          console.log("📝 Initial form data:", formData);
+          if (formData && formData.formData) {
+            processFormData(formData.formData);
           }
         });
         
-        // Method 2: Listen for global form value changes
+        // This captures ALL form value changes - crucial for checkbox groups
         JFCustomWidget.subscribe("formValueChanged", function(data) {
           console.log("📊 Form value changed event:", data);
-          if (data && data.fieldID) {
-            updateStatus("Form value changed for field " + data.fieldID + ": " + JSON.stringify(data.value));
-          }
-        });
-        
-        // Method 3: Improved polling with proper error handling
-        var pollCounter = 0;
-        var maxPolls = 15; // Stop after 15 attempts
-        
-        var pollInterval = setInterval(function() {
-          pollCounter++;
-          if (pollCounter > maxPolls) {
-            clearInterval(pollInterval);
-            console.log("Polling stopped after " + maxPolls + " attempts");
-            return;
-          }
           
-          console.log("Poll attempt #" + pollCounter);
-          
-          // Try to get ALL form values instead of specific ones
+          // Get all current form values after a change
           JFCustomWidget.getAllFormValues(function(response) {
-            console.log("📑 All form values:", response);
-            
-            // Check if we have a valid response structure
-            if (response && response.data && Array.isArray(response.data)) {
-              // Empty array is expected initially when nothing is selected
-              document.getElementById("allValues").textContent = 
-                "All form values: " + JSON.stringify(response.data);
-            } else if (response && response.data) {
-              // Sometimes it returns an object instead of array
-              document.getElementById("allValues").textContent = 
-                "Form values object: " + JSON.stringify(response.data);
+            console.log("🔄 All form values after change:", response);
+            if (response && response.formData) {
+              processFormData(response.formData);
             }
           });
-        }, 2000);
+        });
+        
+        // Function to find and extract checkbox values from form data
+        function processFormData(formData) {
+          console.log("Processing form data:", formData);
+          
+          // Checkboxes in JotForm are often in this format
+          var possibleFieldNames = [
+            "typeA",                  // Base name
+            "q" + qid + "_typeA",     // With question ID prefix
+            "input_" + qid + "_0",    // First checkbox in group
+            qid + "_typeA"            // Alternative format
+          ];
+          
+          // Loop through the form data and look for our field
+          var checkboxValues = [];
+          var fieldFound = false;
+          
+          for (var fieldName in formData) {
+            console.log("Checking field:", fieldName);
+            
+            // Check if field name contains any of our possible names
+            var matchesTarget = possibleFieldNames.some(function(name) {
+              return fieldName.includes(name);
+            });
+            
+            if (matchesTarget) {
+              fieldFound = true;
+              console.log("✅ Found matching field:", fieldName, "=", formData[fieldName]);
+              
+              // Handle single value case
+              if (typeof formData[fieldName] === 'string') {
+                // For checkbox groups, JotForm often returns comma-separated values
+                checkboxValues = formData[fieldName].split(',').map(function(item) {
+                  return item.trim();
+                }).filter(function(item) {
+                  return item !== '';
+                });
+              } 
+              // Handle array case
+              else if (Array.isArray(formData[fieldName])) {
+                checkboxValues = formData[fieldName];
+              }
+              
+              // Display the values
+              updateFieldDisplay(fieldName, checkboxValues);
+            }
+            
+            // Also check if this could be a specific checkbox in the group
+            if (fieldName.match(/typeA_\d+/) || fieldName.match(/q\d+_typeA_\d+/)) {
+              var isChecked = formData[fieldName] === 'Yes' || formData[fieldName] === true || formData[fieldName] === 1;
+              if (isChecked) {
+                console.log("✅ Individual checkbox checked:", fieldName);
+                fieldFound = true;
+                
+                // Extract the option value (usually the last part after underscore)
+                var optionValue = fieldName.split('_').pop();
+                if (!checkboxValues.includes(optionValue)) {
+                  checkboxValues.push(optionValue);
+                }
+                
+                updateFieldDisplay(fieldName, checkboxValues);
+              }
+            }
+          }
+          
+          // If we didn't find the field, update UI to show that
+          if (!fieldFound) {
+            document.getElementById("fieldStatus").style.display = "block";
+            document.getElementById("fieldStatus").innerHTML = 
+              "<strong>No matching checkbox field found.</strong><br>" +
+              "Searched for: " + possibleFieldNames.join(", ") + "<br>" +
+              "Available fields: " + Object.keys(formData).join(", ");
+          }
+          
+          // Always display all form values for debugging
+          document.getElementById("allValues").style.display = "block";
+          document.getElementById("allValues").innerHTML = 
+            "<strong>All form values:</strong><br>" + 
+            "<pre>" + JSON.stringify(formData, null, 2) + "</pre>";
+        }
+        
+        // Helper function to update the display with checkbox values
+        function updateFieldDisplay(fieldName, values) {
+          if (values && values.length > 0) {
+            document.getElementById("fieldStatus").style.display = "block";
+            document.getElementById("fieldStatus").innerHTML = 
+              "<strong>Checkbox values for " + fieldName + ":</strong><br>" +
+              "<ul>" + 
+              values.map(function(val) {
+                return "<li>" + val + "</li>";
+              }).join("") + 
+              "</ul>";
+            
+            console.log("✅ Checkbox values:", values);
+          } else {
+            document.getElementById("fieldStatus").style.display = "block";
+            document.getElementById("fieldStatus").innerHTML = 
+              "<strong>Field " + fieldName + " found but no checkboxes selected.</strong>";
+          }
+        }
       });
       
       // Handle form submission
@@ -96,12 +152,6 @@
           value: document.getElementById("fieldStatus").textContent || "No selection"
         });
       });
-      
-      // Helper function to update status
-      function updateStatus(message) {
-        document.getElementById("fieldStatus").innerHTML = message;
-        document.getElementById("fieldStatus").style.display = "block";
-      }
     </script>
     <style>
       body {
@@ -115,7 +165,7 @@
         border-radius: 4px;
         margin-bottom: 10px;
       }
-      #fieldStatus, #allValues {
+      #fieldStatus {
         padding: 8px;
         background-color: #e6f7ff;
         border-left: 4px solid #1890ff;
@@ -123,10 +173,29 @@
         word-break: break-all;
         display: none;
       }
+      #allValues {
+        padding: 8px;
+        background-color: #f9f9f9;
+        border-left: 4px solid #999;
+        margin: 10px 0;
+        word-break: break-all;
+        display: none;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      pre {
+        white-space: pre-wrap;
+        margin: 0;
+      }
       .note {
         font-size: 12px;
         color: #666;
         margin-top: 12px;
+      }
+      ul {
+        margin: 5px 0;
+        padding-left: 20px;
       }
     </style>
   </head>
@@ -134,6 +203,6 @@
     <div id="status">Loading…</div>
     <div id="fieldStatus" style="display:none;"></div>
     <div id="allValues" style="display:none;"></div>
-    <div class="note">This widget is monitoring field changes. Check your browser console (F12) for detailed logs.</div>
+    <div class="note">This widget is monitoring checkbox group changes. Check your browser console (F12) for detailed logs.</div>
   </body>
 </html>
