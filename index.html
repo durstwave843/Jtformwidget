@@ -7,112 +7,151 @@
       body {
         font-family: Arial, sans-serif;
         padding: 10px;
+        margin: 0;
+        background-color: #f8f8f8;
       }
-      #status {
-        padding: 10px;
-        margin: 10px 0;
-        background: #f0f0f0;
-        border: 1px solid #ccc;
+      
+      .card {
+        background: white;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+        padding: 15px;
       }
-      .debug {
+      
+      h3 {
+        margin-top: 0;
+        color: #333;
+      }
+      
+      .value-display {
         font-family: monospace;
+        background: #f0f0f0;
         padding: 10px;
-        background: #fffaf0;
-        border: 1px solid #ddd;
-        white-space: pre-wrap;
-        margin: 10px 0;
-        max-height: 200px;
-        overflow: auto;
+        border-radius: 4px;
+        margin-top: 10px;
+        min-height: 20px;
+      }
+      
+      .empty {
+        color: #999;
+        font-style: italic;
+      }
+      
+      .button {
+        background: #4CAF50;
+        border: none;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      
+      .button:hover {
+        background: #45a049;
       }
     </style>
   </head>
   <body>
-    <h3>JotForm Test Widget</h3>
+    <div class="card">
+      <h3>Simple Form Field Monitor</h3>
+      <p>Current status: <strong id="status">Connecting...</strong></p>
+      <p>This widget will display any changes to selected form fields.</p>
+    </div>
     
-    <div id="status">Status: Initializing...</div>
+    <div class="card">
+      <h3>Checkbox Field (q3_typeA)</h3>
+      <div id="checkbox-value" class="value-display empty">No value yet</div>
+    </div>
     
-    <div id="form-values" class="debug">No values received yet...</div>
+    <div class="card">
+      <h3>Text Field (q10_typeA10)</h3>
+      <div id="text-value" class="value-display empty">No value yet</div>
+    </div>
     
-    <div id="direct-values" class="debug">No direct values received yet...</div>
-    
-    <div id="log" class="debug">Logs will appear here...</div>
+    <div class="card">
+      <h3>Manual Check</h3>
+      <button id="check-button" class="button">Check Field Values Now</button>
+      <div id="manual-check" class="value-display empty">Click button to check</div>
+    </div>
     
     <script>
-      // Simple logging function
-      function log(message) {
-        var logElement = document.getElementById('log');
-        var time = new Date().toTimeString().split(' ')[0];
-        logElement.innerHTML = time + ': ' + message + '\n' + logElement.innerHTML;
-      }
-      
-      // Update status
-      function updateStatus(message) {
-        document.getElementById('status').innerHTML = 'Status: ' + message;
-      }
-      
-      // Display any data we receive
-      function displayData(data, elementId) {
+      // Simple helper to update value displays
+      function updateValue(elementId, value) {
         var element = document.getElementById(elementId);
-        var content = '';
         
-        try {
-          if (typeof data === 'object') {
-            content = JSON.stringify(data, null, 2);
+        if (value === undefined || value === null || value === "") {
+          element.innerHTML = "No value";
+          element.className = "value-display empty";
+        } else {
+          if (typeof value === 'object') {
+            element.innerHTML = JSON.stringify(value);
           } else {
-            content = String(data);
+            element.innerHTML = value;
           }
-        } catch (e) {
-          content = 'Error displaying data: ' + e.message;
+          element.className = "value-display";
         }
-        
-        element.innerHTML = content;
       }
-
-      // Initialize when script loads
-      log('Script loaded, waiting for JotForm API...');
       
-      // Subscribe to ready event
-      JFCustomWidget.subscribe('ready', function() {
-        log('Ready event received!');
-        updateStatus('Connected to JotForm');
+      // Initialize widget
+      document.getElementById('status').textContent = "Initializing...";
+      
+      // Watch for ready event
+      JFCustomWidget.subscribe("ready", function() {
+        document.getElementById('status').textContent = "Connected";
         
-        // Get widget settings
-        var settings = JFCustomWidget.getWidgetSettings();
-        log('Widget settings: ' + JSON.stringify(settings));
-        
-        // Listen for form value changes
-        JFCustomWidget.subscribe('formValueChanged', function(data) {
-          log('Form value changed: ' + JSON.stringify(data));
-          displayData(data, 'form-values');
+        // Watch for form value changes for the checkbox field
+        JFCustomWidget.subscribe("formValueChanged", function(data) {
+          if (data && data.fieldID) {
+            // Check if it's our checkbox field
+            if (data.fieldID.indexOf("q3_typeA") !== -1) {
+              updateValue("checkbox-value", data.value);
+            }
+            
+            // Check if it's our text field
+            if (data.fieldID.indexOf("q10_typeA10") !== -1 || 
+                data.fieldID.indexOf("input_10") !== -1) {
+              updateValue("text-value", data.value);
+            }
+          }
         });
         
-        // Simple one-time direct check
-        setTimeout(function() {
-          log('Directly checking field values...');
+        // Setup manual check button
+        document.getElementById("check-button").addEventListener("click", function() {
+          updateValue("manual-check", "Checking...");
           
-          var qid = new URLSearchParams(window.location.search).get('qid') || '';
-          log('Question ID: ' + qid);
-          
-          // Try several field formats
-          var fieldNames = ['typeA10', 'q' + qid + '_typeA10', 'input_10', 'q3_typeA'];
-          
-          fieldNames.forEach(function(fieldName) {
-            log('Checking field: ' + fieldName);
+          // Check checkbox field
+          JFCustomWidget.getFieldsValueByName(["q3_typeA"], function(response) {
+            var value = "";
             
-            JFCustomWidget.getFieldsValueByName([fieldName], function(response) {
-              log('Response for ' + fieldName + ': ' + JSON.stringify(response));
-              displayData(response, 'direct-values');
-            });
+            if (response && response.data) {
+              value = response.data;
+            }
+            
+            updateValue("checkbox-value", value);
           });
-        }, 2000);
-        
-        // Handle form submit event
-        JFCustomWidget.subscribe('submit', function() {
-          log('Form submit event received');
-          JFCustomWidget.sendSubmit({
-            valid: true,
-            value: 'Test widget submission'
+          
+          // Check text field
+          JFCustomWidget.getFieldsValueByName(["q10_typeA10"], function(response) {
+            var value = "";
+            
+            if (response && response.data) {
+              value = response.data;
+            }
+            
+            updateValue("text-value", value);
           });
+          
+          updateValue("manual-check", "Check completed");
+        });
+      });
+      
+      // Handle form submission
+      JFCustomWidget.subscribe("submit", function() {
+        JFCustomWidget.sendSubmit({
+          valid: true,
+          value: "Form submitted"
         });
       });
     </script>
