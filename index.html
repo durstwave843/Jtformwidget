@@ -2,199 +2,119 @@
 <html>
   <head>
     <meta charset="utf-8"/>
-    <!-- Load the Widget API -->
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
-    <script>
-      console.log("🏁 widget HTML loaded");
-      
-      // Initialize when the widget is ready
-      JFCustomWidget.subscribe("ready", function() {
-        console.log("🔔 widget ready fired");
-        document.getElementById("status").textContent = "Connected to JotForm";
-        
-        // Get question ID from URL parameters
-        var qid = new URLSearchParams(window.location.search).get('qid') || "";
-        console.log("Widget question ID:", qid);
-        
-        // Listen for form value changes (this is the most reliable method)
-        JFCustomWidget.subscribe("formValueChanged", function(data) {
-          if (data && data.fieldID && data.value !== undefined) {
-            console.log("Form value changed:", data.fieldID, "=", data.value);
-            
-            // Check if this is our target field
-            if (data.fieldID.indexOf("typeA10") !== -1 || 
-                data.fieldID.indexOf("input_10") !== -1) {
-              processValue(data.value);
-            }
-          }
-        });
-        
-        // Poll for values
-        var pollCount = 0;
-        var pollInterval = setInterval(function() {
-          pollCount++;
-          console.log("Polling attempt #" + pollCount);
-          
-          if (pollCount > 30) {
-            clearInterval(pollInterval);
-            console.log("Polling stopped after 30 attempts");
-            return;
-          }
-          
-          // Try target field names
-          var fieldNames = ["typeA10", "q" + qid + "_typeA10", "input_10"];
-          
-          fieldNames.forEach(function(fieldName) {
-            JFCustomWidget.getFieldsValueByName([fieldName], function(response) {
-              console.log("Polling result for " + fieldName + ":", response);
-              
-              if (response && response.data) {
-                // Handle array with object(s)
-                if (Array.isArray(response.data) && response.data.length > 0) {
-                  processValue(response.data);
-                } 
-                // Handle direct value
-                else if (response.data !== undefined) {
-                  processValue(response.data);
-                }
-              }
-            });
-          });
-        }, 3000);
-      });
-      
-      // Process any kind of value we might receive
-      function processValue(value) {
-        console.log("Processing value:", value);
-        
-        var selectedValues = [];
-        
-        // Handle array of objects
-        if (Array.isArray(value)) {
-          selectedValues = value.map(function(item) {
-            // Handle object case
-            if (item && typeof item === 'object') {
-              // Try to extract useful information from the object
-              if (item.text) return item.text;
-              if (item.label) return item.label;
-              if (item.value) return item.value;
-              if (item.name) return item.name;
-              return JSON.stringify(item);
-            }
-            // Handle primitive values
-            return String(item);
-          });
-        }
-        // Handle object
-        else if (value && typeof value === 'object') {
-          // Try to extract useful information
-          if (value.text) selectedValues.push(value.text);
-          else if (value.label) selectedValues.push(value.label);
-          else if (value.value) selectedValues.push(value.value);
-          else if (value.name) selectedValues.push(value.name);
-          else {
-            // Try to get all properties
-            for (var key in value) {
-              if (value.hasOwnProperty(key)) {
-                selectedValues.push(key + ": " + value[key]);
-              }
-            }
-          }
-          
-          // If nothing else works, stringify it
-          if (selectedValues.length === 0) {
-            selectedValues.push(JSON.stringify(value));
-          }
-        }
-        // Handle string or other primitives
-        else if (value) {
-          // Handle comma-separated string
-          if (typeof value === 'string' && value.indexOf(',') !== -1) {
-            selectedValues = value.split(',').map(function(item) {
-              return item.trim();
-            }).filter(function(item) {
-              return item !== '';
-            });
-          } else {
-            // Just use the value directly
-            selectedValues.push(String(value));
-          }
-        }
-        
-        // Update the display
-        updateDisplay(selectedValues);
-        console.log("Processed checkbox values:", selectedValues);
-      }
-      
-      // Update the display with the checkbox values
-      function updateDisplay(values) {
-        var html = "<strong>Selected values:</strong>";
-        
-        if (values.length > 0) {
-          html += "<ul>" + 
-            values.map(function(val) {
-              return "<li>" + val + "</li>";
-            }).join("") + 
-            "</ul>";
-        } else {
-          html += "<p>No items selected</p>";
-        }
-        
-        document.getElementById("selections").innerHTML = html;
-        document.getElementById("selections").style.display = "block";
-      }
-      
-      // Handle form submission
-      JFCustomWidget.subscribe("submit", function() {
-        console.log("🔔 widget submit fired");
-        JFCustomWidget.sendSubmit({
-          valid: true,
-          value: document.getElementById("selections").innerHTML
-        });
-      });
-    </script>
     <style>
       body {
         font-family: Arial, sans-serif;
-        padding: 12px;
-        margin: 0;
-        background-color: #f9f9f9;
+        padding: 10px;
       }
       #status {
-        padding: 8px;
-        background-color: #e8f5e9;
-        border-radius: 4px;
-        border-left: 4px solid #4caf50;
-        margin-bottom: 10px;
-        font-weight: bold;
-      }
-      #selections {
-        padding: 8px;
-        background-color: #fff;
-        border-radius: 4px;
-        border: 1px solid #ddd;
+        padding: 10px;
         margin: 10px 0;
-        word-break: break-all;
-        display: none;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
       }
-      #selections ul {
-        margin: 5px 0;
-        padding-left: 20px;
-      }
-      #selections li {
-        margin-bottom: 4px;
-      }
-      .note {
-        font-size: 12px;
-        color: #666;
-        margin-top: 12px;
-        font-style: italic;
+      .debug {
+        font-family: monospace;
+        padding: 10px;
+        background: #fffaf0;
+        border: 1px solid #ddd;
+        white-space: pre-wrap;
+        margin: 10px 0;
+        max-height: 200px;
+        overflow: auto;
       }
     </style>
   </head>
   <body>
-    <div id="status">Connecting to JotForm...</div>
-    <div id="selections"></div>
-    <div class="note">This widget displays selected checkbox values from your form</div>
+    <h3>JotForm Test Widget</h3>
+    
+    <div id="status">Status: Initializing...</div>
+    
+    <div id="form-values" class="debug">No values received yet...</div>
+    
+    <div id="direct-values" class="debug">No direct values received yet...</div>
+    
+    <div id="log" class="debug">Logs will appear here...</div>
+    
+    <script>
+      // Simple logging function
+      function log(message) {
+        var logElement = document.getElementById('log');
+        var time = new Date().toTimeString().split(' ')[0];
+        logElement.innerHTML = time + ': ' + message + '\n' + logElement.innerHTML;
+      }
+      
+      // Update status
+      function updateStatus(message) {
+        document.getElementById('status').innerHTML = 'Status: ' + message;
+      }
+      
+      // Display any data we receive
+      function displayData(data, elementId) {
+        var element = document.getElementById(elementId);
+        var content = '';
+        
+        try {
+          if (typeof data === 'object') {
+            content = JSON.stringify(data, null, 2);
+          } else {
+            content = String(data);
+          }
+        } catch (e) {
+          content = 'Error displaying data: ' + e.message;
+        }
+        
+        element.innerHTML = content;
+      }
+
+      // Initialize when script loads
+      log('Script loaded, waiting for JotForm API...');
+      
+      // Subscribe to ready event
+      JFCustomWidget.subscribe('ready', function() {
+        log('Ready event received!');
+        updateStatus('Connected to JotForm');
+        
+        // Get widget settings
+        var settings = JFCustomWidget.getWidgetSettings();
+        log('Widget settings: ' + JSON.stringify(settings));
+        
+        // Listen for form value changes
+        JFCustomWidget.subscribe('formValueChanged', function(data) {
+          log('Form value changed: ' + JSON.stringify(data));
+          displayData(data, 'form-values');
+        });
+        
+        // Simple one-time direct check
+        setTimeout(function() {
+          log('Directly checking field values...');
+          
+          var qid = new URLSearchParams(window.location.search).get('qid') || '';
+          log('Question ID: ' + qid);
+          
+          // Try several field formats
+          var fieldNames = ['typeA10', 'q' + qid + '_typeA10', 'input_10', 'q3_typeA'];
+          
+          fieldNames.forEach(function(fieldName) {
+            log('Checking field: ' + fieldName);
+            
+            JFCustomWidget.getFieldsValueByName([fieldName], function(response) {
+              log('Response for ' + fieldName + ': ' + JSON.stringify(response));
+              displayData(response, 'direct-values');
+            });
+          });
+        }, 2000);
+        
+        // Handle form submit event
+        JFCustomWidget.subscribe('submit', function() {
+          log('Form submit event received');
+          JFCustomWidget.sendSubmit({
+            valid: true,
+            value: 'Test widget submission'
+          });
+        });
+      });
+    </script>
   </body>
 </html>
