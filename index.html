@@ -2,115 +2,141 @@
 <html>
   <head>
     <meta charset="utf-8"/>
-    <!-- Load the Widget API correctly -->
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <script>
       console.log("🏁 widget HTML loaded");
       
-      // Always subscribe to ready event first - this is the recommended pattern
-      // in the JotForm documentation
+      // Global variables to store state
+      var checkboxValues = [];
+      var qid = "";
+      var formID = "";
+      
+      // Initialize when the widget is ready
       JFCustomWidget.subscribe("ready", function() {
         console.log("🔔 widget ready fired");
         document.getElementById("status").textContent = "Connected to JotForm";
         
-        // Get widget settings if provided
-        var settings = JFCustomWidget.getWidgetSettings();
-        console.log("Widget settings:", settings);
+        // Get form ID and question ID from widget parameters
+        var widgetData = JFCustomWidget.getWidgetSettings();
+        qid = new URLSearchParams(window.location.search).get('qid') || "";
         
-        // Get question ID from URL parameters
-        var qid = getQuestionId();
-        console.log("Widget question ID:", qid);
+        console.log("Widget settings:", widgetData);
+        console.log("Question ID:", qid);
         
-        // Target field names we want to listen to
-        var targetFieldNames = [
-          "typeA10",
-          "q" + qid + "_typeA10",
-          "input_" + qid
-        ];
-        
-        console.log("Will try to listen to fields:", targetFieldNames);
-        
-        // Set up listeners for each possible field name
-        targetFieldNames.forEach(function(fieldName) {
-          // Use listenFromField method as documented
-          JFCustomWidget.listenFromField(fieldName, "change", function(value) {
-            console.log("✅ Change detected on " + fieldName + ":", value);
-            processValue(fieldName, value);
+        // Set up form submission handler
+        JFCustomWidget.subscribe("submit", function() {
+          console.log("Form submit detected");
+          JFCustomWidget.sendSubmit({
+            valid: true,
+            value: checkboxValues.join(", ")
           });
         });
         
-        // Also listen for form-wide value changes
+        // Set up listener specifically for the checkbox group in your form
+        setupCheckboxListener();
+        
+        // Display initial message
+        document.getElementById("selections").innerHTML = "<p>Waiting for checkbox selections...</p>";
+        document.getElementById("selections").style.display = "block";
+      });
+      
+      // Set up a listener for the checkbox field (q3_typeA)
+      function setupCheckboxListener() {
+        // IDs to try based on your form structure
+        var fieldIds = [
+          "input_3_0",    // First checkbox Asphalt
+          "input_3_1",    // Second checkbox Metal
+          "input_3_2"     // Third checkbox Tile
+        ];
+        
+        // Set up a parent form value change listener
         JFCustomWidget.subscribe("formValueChanged", function(data) {
-          if (data && data.fieldID && data.value !== undefined) {
-            // Check if this is our target field
-            if (isTargetField(data.fieldID, targetFieldNames)) {
-              console.log("✅ Target field changed:", data.fieldID, "=", data.value);
-              processValue(data.fieldID, data.value);
-            }
+          console.log("Form value changed:", data);
+          
+          // Check if this is our checkbox field
+          if (data && data.fieldID && data.fieldID.indexOf("q3_typeA") !== -1) {
+            console.log("Checkbox field changed:", data);
+            updateTextFieldValue();
+          }
+          
+          // Also directly check for the piped text field
+          if (data && data.fieldID && data.fieldID.indexOf("q10_typeA10") !== -1) {
+            console.log("Text field changed:", data);
+            processTextFieldValue(data.value);
           }
         });
         
-        // Try using getFieldsValueByName as documented
-        // This should be placed inside the ready event according to docs
-        targetFieldNames.forEach(function(fieldName) {
-          JFCustomWidget.getFieldsValueByName([fieldName], function(response) {
-            console.log("Initial field value for " + fieldName + ":", response);
-            if (response && response.data !== undefined) {
-              processValue(fieldName, response.data);
-            }
+        // Use listenFromField for the specific field
+        JFCustomWidget.listenFromField("q3_typeA", "change", function(value) {
+          console.log("Checkbox value changed:", value);
+          updateTextFieldValue();
+        });
+        
+        // Listen for the text field value that contains the piped checkbox values
+        JFCustomWidget.listenFromField("q10_typeA10", "change", function(value) {
+          console.log("Text field value changed:", value);
+          processTextFieldValue(value);
+        });
+        
+        // Direct polling for textbox field
+        startPollingForTextValue();
+      }
+      
+      // Poll for text field value since other methods might not work
+      function startPollingForTextValue() {
+        var pollCounter = 0;
+        
+        var pollInterval = setInterval(function() {
+          pollCounter++;
+          console.log("Polling attempt #" + pollCounter);
+          
+          if (pollCounter > 30) {
+            clearInterval(pollInterval);
+            console.log("Polling stopped after 30 attempts");
+            return;
+          }
+          
+          // Try to get the value from the text field
+          var fieldIds = ["q10_typeA10", "input_10"];
+          
+          fieldIds.forEach(function(fieldId) {
+            JFCustomWidget.getFieldsValueByName([fieldId], function(response) {
+              console.log("Polling result for " + fieldId + ":", response);
+              
+              if (response && response.data !== undefined) {
+                processTextFieldValue(response.data);
+              }
+            });
           });
-        });
-        
-        // Initialize display
-        updateDisplay("Waiting for typeA10 field values...", []);
-      });
-      
-      // Handle form submission as documented in the API
-      JFCustomWidget.subscribe("submit", function() {
-        console.log("🔔 widget submit fired");
-        
-        // Send back the current value using sendSubmit
-        JFCustomWidget.sendSubmit({
-          valid: true,
-          value: document.getElementById("selections").textContent || ""
-        });
-      });
-      
-      // Helper function to get question ID from URL
-      function getQuestionId() {
-        var urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('qid') || "";
+        }, 3000);
       }
       
-      // Helper function to check if a field ID matches any of our target fields
-      function isTargetField(fieldID, targetFields) {
-        return targetFields.some(function(targetField) {
-          return fieldID.indexOf(targetField) !== -1;
-        });
+      // Update the text field with current checkbox values
+      function updateTextFieldValue() {
+        // This function attempts to read the checkboxes and update the text field
+        // However, we can't directly access parent form elements from the iframe
+        // Rely on the form's conditions to populate the text field instead
+        console.log("Checkbox values may have changed - waiting for text field update");
       }
       
-      // Process the comma-separated value from the field
-      function processValue(fieldName, value) {
+      // Process the text field value that contains comma-separated checkbox values
+      function processTextFieldValue(value) {
         if (!value) {
           updateDisplay("No checkboxes selected", []);
           return;
         }
         
-        // Make sure we have a string
+        // Convert to string and split by comma
         var textValue = String(value);
-        
-        // Split by comma and clean up values
-        var selectedValues = textValue.split(',').map(function(item) {
+        checkboxValues = textValue.split(',').map(function(item) {
           return item.trim();
         }).filter(function(item) {
           return item !== '';
         });
         
         // Update the display
-        updateDisplay("Selections from " + fieldName, selectedValues);
-        
-        // Log the values
-        console.log("Parsed checkbox values:", selectedValues);
+        updateDisplay("Selected items:", checkboxValues);
+        console.log("✅ Parsed checkbox values:", checkboxValues);
       }
       
       // Update the display with the checkbox values
@@ -127,8 +153,8 @@
           html += "<p>No items selected</p>";
         }
         
-        document.getElementById("selections").style.display = "block";
         document.getElementById("selections").innerHTML = html;
+        document.getElementById("selections").style.display = "block";
       }
     </script>
     <style>
@@ -172,7 +198,11 @@
   </head>
   <body>
     <div id="status">Connecting to JotForm...</div>
-    <div id="selections" style="display:none;"></div>
-    <div class="note">This widget monitors the piped text field {typeA10} which contains your checkbox selections.</div>
+    <div id="selections"></div>
+    <div class="note">
+      This widget displays the checkbox selections from the form.
+      <br>
+      It reads values from the text field (q10_typeA10) which is automatically populated by the form's calculation.
+    </div>
   </body>
 </html>
