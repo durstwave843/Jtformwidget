@@ -4,6 +4,8 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <!-- Add html2canvas library -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -134,7 +136,7 @@
         }
         
         // Build the table
-        var tableHTML = '<table class="dynamic-table">';
+        var tableHTML = '<table id="selectionTable" class="dynamic-table">';
         
         // Table header
         tableHTML += '<tr><th>Location</th>';
@@ -187,6 +189,30 @@
         updateDynamicTable();
       }
       
+      // Function to capture table as image
+      async function captureTableAsImage() {
+        const tableElement = document.getElementById('selectionTable');
+        
+        if (!tableElement) {
+          return null; // No table to capture
+        }
+        
+        try {
+          // Create canvas from table element
+          const canvas = await html2canvas(tableElement, {
+            backgroundColor: "#ffffff",
+            scale: 2, // Higher scale for better quality
+            logging: false
+          });
+          
+          // Convert canvas to data URL (PNG image)
+          return canvas.toDataURL("image/png");
+        } catch (error) {
+          console.error("Error capturing table:", error);
+          return null;
+        }
+      }
+      
       // Initialize the widget
       JFCustomWidget.subscribe("ready", function() {
         // Set up listeners for each individual checkbox
@@ -210,8 +236,11 @@
       });
       
       // Handle form submission
-      JFCustomWidget.subscribe("submit", function() {
-        // Prepare table data for submission
+      JFCustomWidget.subscribe("submit", async function() {
+        // Capture the table as an image
+        const tableImage = await captureTableAsImage();
+        
+        // Prepare regular table data as fallback
         var tableData = {};
         tableRows.forEach(function(row) {
           tableData[row] = {};
@@ -222,9 +251,13 @@
           }
         });
         
+        // Send both the image and the table data
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: JSON.stringify(tableData)
+          value: JSON.stringify({
+            tableData: tableData,
+            tableImage: tableImage
+          })
         });
       });
     </script>
