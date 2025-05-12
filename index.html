@@ -1,25 +1,35 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
-  </head>
-  <body>
-    <div id="main">
-      <h3>This is my first widget.</h3>
-      <span id="labelText"></span>
-      <input type="text" id="userInput">
-    </div>
+    <meta charset="utf-8"/>
+    <!-- 1) Load the Widget API immediately -->
+    <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+    <!-- 2) Subscribe to ready/submit before the body even parses -->
     <script>
-      JFCustomWidget.subscribe("ready", function(){
-        const label = JFCustomWidget.getWidgetSetting('QuestionLabel');
-        document.getElementById('labelText').innerHTML = label;
-        JFCustomWidget.subscribe("submit", function(){
-          JFCustomWidget.sendSubmit({
-            valid: true,
-            value: document.getElementById('userInput').value
-          });
+      // fire as soon as the host posts its 'ready' event
+      JFCustomWidget.subscribe("ready", function() {
+        console.log("🔔 widget ready!");
+        // pick up the exact parameter name you registered in Dev console
+        const label = JFCustomWidget.getWidgetSetting("QuestionLabel");
+        console.log(" → QuestionLabel:", label);
+        document.getElementById("labelText").textContent = label;
+      });
+
+      JFCustomWidget.subscribe("submit", function() {
+        console.log("🔔 submit pressed, sending back value");
+        JFCustomWidget.sendSubmit({
+          valid: true,
+          value: document.getElementById("userInput").value
         });
       });
     </script>
-</body>
+  </head>
+
+  <body>
+    <h3>This is my first widget.</h3>
+    <!-- we’ll overwrite this span once ready fires -->
+    <span id="labelText"></span><br>
+    <input type="text" id="userInput" placeholder="type something…"/>
+  </body>
 </html>
