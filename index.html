@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <style>
       body {
@@ -82,6 +83,62 @@
         max-height: 200px;
         overflow-y: auto;
       }
+      
+      /* Dynamic Table Styles */
+      .dynamic-table-container {
+        margin-top: 25px;
+        border-top: 1px solid #ddd;
+        padding-top: 15px;
+      }
+      
+      .dynamic-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      
+      .dynamic-table th, .dynamic-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+      }
+      
+      .dynamic-table th {
+        background-color: #f2f2f2;
+        color: #333;
+        font-weight: bold;
+      }
+      
+      .dynamic-table tr td:first-child {
+        background-color: #f8f8f8;
+        font-weight: bold;
+        text-align: left;
+      }
+      
+      .no-selections-message {
+        color: #888;
+        font-style: italic;
+        margin: 20px 0;
+      }
+      
+      /* Table cell checkbox styles */
+      .table-checkbox {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      
+      .table-checkbox.checked {
+        background-color: #4CAF50;
+        border-color: #4CAF50;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -108,6 +165,14 @@
         No selections yet
       </div>
       
+      <!-- Dynamic Table Container -->
+      <div class="dynamic-table-container">
+        <h3>Detail Information</h3>
+        <div id="dynamic-table-area">
+          <div class="no-selections-message">Select at least one option above to generate the table</div>
+        </div>
+      </div>
+      
       <div id="debug-info" class="debug-info"></div>
     </div>
     
@@ -118,6 +183,26 @@
         "Metal": 0,
         "Tile": 0
       };
+      
+      // Fixed rows for the table
+      var tableRows = ["Home", "Barn", "Garage"];
+      
+      // Store values in the dynamic table (3D object: row > column > checked state)
+      var tableValues = {};
+      
+      // Initialize table values
+      function initTableValues() {
+        tableRows.forEach(function(row) {
+          tableValues[row] = {};
+          for (var option in checkboxState) {
+            tableValues[row][option] = 0; // 0 = unchecked, 1 = checked
+          }
+        });
+        log("Table values initialized");
+      }
+      
+      // Call initialization once
+      initTableValues();
       
       // Log events for debugging
       function log(message) {
@@ -148,6 +233,9 @@
           document.getElementById("all-selections").innerHTML = 
             "No selections yet";
         }
+        
+        // Update the dynamic table based on selections
+        updateDynamicTable();
       }
       
       // Update a single checkbox indicator
@@ -161,6 +249,66 @@
           indicator.className = "checkbox-indicator";
           indicator.innerHTML = "";
         }
+      }
+      
+      // Update the dynamic table
+      function updateDynamicTable() {
+        var tableArea = document.getElementById("dynamic-table-area");
+        var selectedOptions = [];
+        
+        // Get selected options
+        for (var option in checkboxState) {
+          if (checkboxState[option] === 1) {
+            selectedOptions.push(option);
+          }
+        }
+        
+        // If no options are selected, show message
+        if (selectedOptions.length === 0) {
+          tableArea.innerHTML = '<div class="no-selections-message">Select at least one option above to generate the table</div>';
+          return;
+        }
+        
+        // Build the table
+        var tableHTML = '<table class="dynamic-table">';
+        
+        // Table header
+        tableHTML += '<tr><th>Location</th>';
+        selectedOptions.forEach(function(option) {
+          tableHTML += '<th>' + option + '</th>';
+        });
+        tableHTML += '</tr>';
+        
+        // Table rows
+        tableRows.forEach(function(row) {
+          tableHTML += '<tr><td>' + row + '</td>';
+          
+          selectedOptions.forEach(function(option) {
+            var isChecked = tableValues[row][option] === 1;
+            var checkboxClass = isChecked ? "table-checkbox checked" : "table-checkbox";
+            var checkmark = isChecked ? "✓" : "";
+            
+            tableHTML += '<td>' +
+              '<div class="' + checkboxClass + '" ' +
+              'onclick="toggleTableCheckbox(\'' + row + '\', \'' + option + '\')">' +
+              checkmark + '</div></td>';
+          });
+          
+          tableHTML += '</tr>';
+        });
+        
+        tableHTML += '</table>';
+        tableArea.innerHTML = tableHTML;
+      }
+      
+      // Toggle cell checkbox in the table
+      function toggleTableCheckbox(row, option) {
+        // Toggle value: 0 to 1, or 1 to 0
+        tableValues[row][option] = tableValues[row][option] === 0 ? 1 : 0;
+        log("Toggled " + row + " - " + option + " to " + tableValues[row][option]);
+        
+        // Update the table display
+        updateDynamicTable();
       }
       
       // Handle checkbox changes - toggle state when event is received
@@ -215,9 +363,26 @@
           }
         }
         
+        // Prepare table data for submission
+        var tableData = {};
+        tableRows.forEach(function(row) {
+          tableData[row] = {};
+          for (var option in checkboxState) {
+            if (checkboxState[option] === 1) { // Only include selected options
+              tableData[row][option] = tableValues[row][option] === 1 ? "Yes" : "No";
+            }
+          }
+        });
+        
+        // Combine all data
+        var submitData = {
+          selections: selections.join(", "),
+          table: tableData
+        };
+        
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: selections.join(", ")
+          value: JSON.stringify(submitData)
         });
       });
     </script>
