@@ -79,7 +79,8 @@
         background-color: #f5f5f5;
         padding: 8px;
         border-radius: 4px;
-        display: none;
+        max-height: 200px;
+        overflow-y: auto;
       }
     </style>
   </head>
@@ -111,45 +112,34 @@
     </div>
     
     <script>
-      // Track the selected checkboxes with a lastValue property
-      var checkboxState = [
-        { name: "Asphalt", selected: false, lastValue: null },
-        { name: "Metal", selected: false, lastValue: null },
-        { name: "Tile", selected: false, lastValue: null }
-      ];
+      // Track the state of each checkbox (0 = unchecked, 1 = checked)
+      var checkboxState = {
+        "Asphalt": 0,
+        "Metal": 0,
+        "Tile": 0
+      };
       
-      // Debug logging - can be enabled if needed
-      var debugMode = false;
-      
-      function debugLog(message) {
-        if (debugMode) {
-          var debugElement = document.getElementById("debug-info");
-          debugElement.style.display = "block";
-          debugElement.innerHTML = message + "<br>" + debugElement.innerHTML;
-        }
+      // Log events for debugging
+      function log(message) {
+        var debugElement = document.getElementById("debug-info");
+        var time = new Date().toTimeString().split(' ')[0];
+        debugElement.innerHTML = time + ": " + message + "<br>" + debugElement.innerHTML;
       }
       
       // Update the visual checkbox indicators
       function updateCheckboxDisplay() {
-        // Update each checkbox indicator
-        for (var i = 0; i < checkboxState.length; i++) {
-          var indicator = document.getElementById("checkbox-" + i);
-          
-          if (checkboxState[i].selected) {
-            indicator.className = "checkbox-indicator checked";
-            indicator.innerHTML = "✓";
-          } else {
-            indicator.className = "checkbox-indicator";
-            indicator.innerHTML = "";
-          }
-        }
+        // Update checkboxes
+        updateCheckbox(0, "Asphalt");
+        updateCheckbox(1, "Metal");
+        updateCheckbox(2, "Tile");
         
         // Update the selections summary
-        var selections = checkboxState.filter(function(item) {
-          return item.selected;
-        }).map(function(item) {
-          return item.name;
-        });
+        var selections = [];
+        for (var option in checkboxState) {
+          if (checkboxState[option] === 1) {
+            selections.push(option);
+          }
+        }
         
         if (selections.length > 0) {
           document.getElementById("all-selections").innerHTML = 
@@ -160,28 +150,31 @@
         }
       }
       
-      // Handle checkbox changes
-      function handleCheckboxChange(index, value) {
-        // Get checkbox state
-        var checkbox = checkboxState[index];
+      // Update a single checkbox indicator
+      function updateCheckbox(index, name) {
+        var indicator = document.getElementById("checkbox-" + index);
         
-        debugLog("Checkbox " + index + " (" + checkbox.name + ") change: " + value);
-        
-        // If we receive a change event with the checkbox name (e.g., "Asphalt"),
-        // that means the checkbox was checked
-        if (value === checkbox.name) {
-          debugLog("Checkbox " + index + " was checked");
-          checkbox.selected = true;
-        } 
-        // If we receive an empty value or a different value, and the checkbox was previously
-        // checked (i.e., the last value was the checkbox name), that means it was unchecked
-        else if (checkbox.lastValue === checkbox.name) {
-          debugLog("Checkbox " + index + " was unchecked");
-          checkbox.selected = false;
+        if (checkboxState[name] === 1) {
+          indicator.className = "checkbox-indicator checked";
+          indicator.innerHTML = "✓";
+        } else {
+          indicator.className = "checkbox-indicator";
+          indicator.innerHTML = "";
         }
+      }
+      
+      // Handle checkbox changes - toggle state when event is received
+      function handleCheckboxEvent(checkboxName) {
+        log("Received event for " + checkboxName);
         
-        // Update the last value
-        checkbox.lastValue = value;
+        // Toggle the state (0 to 1, or 1 to 0)
+        if (checkboxState[checkboxName] === 0) {
+          log("Setting " + checkboxName + " to checked");
+          checkboxState[checkboxName] = 1;
+        } else {
+          log("Setting " + checkboxName + " to unchecked");
+          checkboxState[checkboxName] = 0;
+        }
         
         // Update the display
         updateCheckboxDisplay();
@@ -190,49 +183,37 @@
       // Initialize the widget
       JFCustomWidget.subscribe("ready", function() {
         document.getElementById("status").innerHTML = "Connected to form";
-        debugLog("Widget ready event received");
+        log("Widget ready");
         
         // Set up listeners for each individual checkbox
-        for (var i = 0; i < checkboxState.length; i++) {
-          (function(index) {
-            var inputId = "input_3_" + index;
-            debugLog("Setting up listener for " + inputId);
-            
-            JFCustomWidget.listenFromField(inputId, "change", function(value) {
-              handleCheckboxChange(index, value);
-            });
-          })(i);
-        }
+        JFCustomWidget.listenFromField("input_3_0", "change", function(value) {
+          if (value === "Asphalt") {
+            handleCheckboxEvent("Asphalt");
+          }
+        });
         
-        // Check for initial values
-        for (var i = 0; i < checkboxState.length; i++) {
-          (function(index) {
-            var inputId = "input_3_" + index;
-            
-            JFCustomWidget.getFieldsValueByName([inputId], function(response) {
-              debugLog("Initial value for " + inputId + ": " + JSON.stringify(response));
-              
-              if (response && response.data && response.data.length > 0) {
-                var value = response.data[0].value;
-                if (value === checkboxState[index].name) {
-                  checkboxState[index].selected = true;
-                  checkboxState[index].lastValue = value;
-                  updateCheckboxDisplay();
-                }
-              }
-            });
-          })(i);
-        }
+        JFCustomWidget.listenFromField("input_3_1", "change", function(value) {
+          if (value === "Metal") {
+            handleCheckboxEvent("Metal");
+          }
+        });
+        
+        JFCustomWidget.listenFromField("input_3_2", "change", function(value) {
+          if (value === "Tile") {
+            handleCheckboxEvent("Tile");
+          }
+        });
       });
       
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
         // Get the selected values as an array
-        var selections = checkboxState.filter(function(item) {
-          return item.selected;
-        }).map(function(item) {
-          return item.name;
-        });
+        var selections = [];
+        for (var option in checkboxState) {
+          if (checkboxState[option] === 1) {
+            selections.push(option);
+          }
+        }
         
         JFCustomWidget.sendSubmit({
           valid: true,
