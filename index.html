@@ -2,173 +2,177 @@
 <html>
   <head>
     <meta charset="utf-8"/>
-    <!-- Load the Widget API -->
-    <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <!-- Load the Widget API correctly -->
+    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <script>
       console.log("🏁 widget HTML loaded");
       
-      // Initialize the widget when ready
+      // Always subscribe to ready event first - this is the recommended pattern
+      // in the JotForm documentation
       JFCustomWidget.subscribe("ready", function() {
         console.log("🔔 widget ready fired");
         document.getElementById("status").textContent = "Connected to JotForm";
         
+        // Get widget settings if provided
+        var settings = JFCustomWidget.getWidgetSettings();
+        console.log("Widget settings:", settings);
+        
         // Get question ID from URL parameters
-        var urlParams = new URLSearchParams(window.location.search);
-        var qid = urlParams.get('qid');
+        var qid = getQuestionId();
         console.log("Widget question ID:", qid);
         
-        // Target the piped text field with name typeA10
+        // Target field names we want to listen to
         var targetFieldNames = [
-          "typeA10",               // Basic field name
-          "q" + qid + "_typeA10",  // With question ID
-          "input_typeA10",         // Input prefix
-          "input_" + qid           // Input with question ID
+          "typeA10",
+          "q" + qid + "_typeA10",
+          "input_" + qid
         ];
         
-        console.log("Will try these field names:", targetFieldNames);
+        console.log("Will try to listen to fields:", targetFieldNames);
         
         // Set up listeners for each possible field name
         targetFieldNames.forEach(function(fieldName) {
-          console.log("Setting up listener for:", fieldName);
-          
-          // Listen for changes to the piped text field
+          // Use listenFromField method as documented
           JFCustomWidget.listenFromField(fieldName, "change", function(value) {
-            console.log("✅ Field change detected on " + fieldName + ":", value);
-            processTextFieldValue(fieldName, value);
+            console.log("✅ Change detected on " + fieldName + ":", value);
+            processValue(fieldName, value);
           });
         });
         
-        // Also listen for form value changes to catch the piped field
+        // Also listen for form-wide value changes
         JFCustomWidget.subscribe("formValueChanged", function(data) {
-          console.log("Form value changed:", data);
-          
-          if (data && data.fieldID) {
-            // Check if the changed field matches any of our target names
-            var isTargetField = targetFieldNames.some(function(name) {
-              return data.fieldID.includes(name);
-            });
-            
-            if (isTargetField) {
+          if (data && data.fieldID && data.value !== undefined) {
+            // Check if this is our target field
+            if (isTargetField(data.fieldID, targetFieldNames)) {
               console.log("✅ Target field changed:", data.fieldID, "=", data.value);
-              processTextFieldValue(data.fieldID, data.value);
+              processValue(data.fieldID, data.value);
             }
           }
         });
         
-        // Fall back to polling if event-based approaches don't work
-        var pollCount = 0;
-        var maxPolls = 30;
-        
-        var pollInterval = setInterval(function() {
-          pollCount++;
-          console.log("Polling attempt #" + pollCount);
-          
-          if (pollCount > maxPolls) {
-            clearInterval(pollInterval);
-            console.log("Stopped polling after " + maxPolls + " attempts");
-            return;
-          }
-          
-          targetFieldNames.forEach(function(fieldName) {
-            // Use getFieldsValueByName which is documented and should work
-            JFCustomWidget.getFieldsValueByName(fieldName, function(response) {
-              console.log("Polling result for " + fieldName + ":", response);
-              
-              // Check if we got any usable data
-              if (response && response.data !== undefined) {
-                processTextFieldValue(fieldName, response.data);
-              }
-            });
+        // Try using getFieldsValueByName as documented
+        // This should be placed inside the ready event according to docs
+        targetFieldNames.forEach(function(fieldName) {
+          JFCustomWidget.getFieldsValueByName([fieldName], function(response) {
+            console.log("Initial field value for " + fieldName + ":", response);
+            if (response && response.data !== undefined) {
+              processValue(fieldName, response.data);
+            }
           });
-        }, 2000); // Poll every 2 seconds
+        });
         
-        // Process the comma-separated text value from the field
-        function processTextFieldValue(fieldName, value) {
-          if (!value) {
-            updateDisplay("No checkboxes selected", []);
-            return;
-          }
-          
-          // Convert to string if it's not already
-          var textValue = String(value);
-          
-          // Split by comma and trim each value
-          var selectedValues = textValue.split(',').map(function(item) {
-            return item.trim();
-          }).filter(function(item) {
-            return item !== '';
-          });
-          
-          // Update the display
-          updateDisplay("Selections from " + fieldName, selectedValues);
-          
-          // Log the parsed values
-          console.log("Parsed checkbox values:", selectedValues);
-        }
-        
-        // Update the display with the checkbox values
-        function updateDisplay(title, values) {
-          var html = "<strong>" + title + ":</strong>";
-          
-          if (values.length > 0) {
-            html += "<ul>" + 
-              values.map(function(val) {
-                return "<li>" + val + "</li>";
-              }).join("") + 
-              "</ul>";
-          } else {
-            html += "<p>No items selected</p>";
-          }
-          
-          document.getElementById("fieldStatus").style.display = "block";
-          document.getElementById("fieldStatus").innerHTML = html;
-        }
+        // Initialize display
+        updateDisplay("Waiting for typeA10 field values...", []);
       });
       
-      // Handle form submission
+      // Handle form submission as documented in the API
       JFCustomWidget.subscribe("submit", function() {
         console.log("🔔 widget submit fired");
-        var fieldContent = document.getElementById("fieldStatus").innerHTML || "No selection";
+        
+        // Send back the current value using sendSubmit
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: fieldContent
+          value: document.getElementById("selections").textContent || ""
         });
       });
+      
+      // Helper function to get question ID from URL
+      function getQuestionId() {
+        var urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('qid') || "";
+      }
+      
+      // Helper function to check if a field ID matches any of our target fields
+      function isTargetField(fieldID, targetFields) {
+        return targetFields.some(function(targetField) {
+          return fieldID.indexOf(targetField) !== -1;
+        });
+      }
+      
+      // Process the comma-separated value from the field
+      function processValue(fieldName, value) {
+        if (!value) {
+          updateDisplay("No checkboxes selected", []);
+          return;
+        }
+        
+        // Make sure we have a string
+        var textValue = String(value);
+        
+        // Split by comma and clean up values
+        var selectedValues = textValue.split(',').map(function(item) {
+          return item.trim();
+        }).filter(function(item) {
+          return item !== '';
+        });
+        
+        // Update the display
+        updateDisplay("Selections from " + fieldName, selectedValues);
+        
+        // Log the values
+        console.log("Parsed checkbox values:", selectedValues);
+      }
+      
+      // Update the display with the checkbox values
+      function updateDisplay(title, values) {
+        var html = "<strong>" + title + "</strong>";
+        
+        if (values.length > 0) {
+          html += "<ul>" + 
+            values.map(function(val) {
+              return "<li>" + val + "</li>";
+            }).join("") + 
+            "</ul>";
+        } else {
+          html += "<p>No items selected</p>";
+        }
+        
+        document.getElementById("selections").style.display = "block";
+        document.getElementById("selections").innerHTML = html;
+      }
     </script>
     <style>
       body {
         font-family: Arial, sans-serif;
         padding: 12px;
         margin: 0;
+        background-color: #f9f9f9;
       }
       #status {
         padding: 8px;
-        background-color: #f0f0f0;
+        background-color: #e8f5e9;
         border-radius: 4px;
+        border-left: 4px solid #4caf50;
         margin-bottom: 10px;
+        font-weight: bold;
       }
-      #fieldStatus {
+      #selections {
         padding: 8px;
-        background-color: #e6f7ff;
-        border-left: 4px solid #1890ff;
+        background-color: #fff;
+        border-radius: 4px;
+        border: 1px solid #ddd;
         margin: 10px 0;
         word-break: break-all;
         display: none;
       }
-      ul {
+      #selections ul {
         margin: 5px 0;
         padding-left: 20px;
+      }
+      #selections li {
+        margin-bottom: 4px;
       }
       .note {
         font-size: 12px;
         color: #666;
         margin-top: 12px;
+        font-style: italic;
       }
     </style>
   </head>
   <body>
-    <div id="status">Loading…</div>
-    <div id="fieldStatus" style="display:none;"></div>
-    <div class="note">This widget is monitoring the piped text field {typeA10}. Check your browser console (F12) for detailed logs.</div>
+    <div id="status">Connecting to JotForm...</div>
+    <div id="selections" style="display:none;"></div>
+    <div class="note">This widget monitors the piped text field {typeA10} which contains your checkbox selections.</div>
   </body>
 </html>
