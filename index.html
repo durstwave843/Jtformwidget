@@ -27,6 +27,14 @@
         padding-bottom: 10px;
       }
       
+      .info-message {
+        background-color: #e7f3fe;
+        border-left: 6px solid #2196F3;
+        margin: 15px 0;
+        padding: 12px;
+        color: #333;
+      }
+      
       /* Dynamic Table Styles */
       .dynamic-table {
         width: 100%;
@@ -77,16 +85,8 @@
         color: white;
       }
       
-      /* PDF Friendly Preview Styles */
-      .pdf-preview {
-        margin-top: 20px;
-        border-top: 1px dashed #ccc;
-        padding-top: 15px;
-        font-family: "Courier New", monospace;
-        white-space: pre-wrap;
-        background-color: #f9f9f9;
-        padding: 15px;
-        border-radius: 4px;
+      /* Hidden fields for Jotform submission */
+      .hidden-fields {
         display: none;
       }
     </style>
@@ -95,13 +95,18 @@
     <div class="container">
       <h3>Details</h3>
       
+      <!-- Information Message -->
+      <div class="info-message">
+        Note: For optimal PDF display, use the "Input Table" element in the Jotform PDF Editor and map it to these fields.
+      </div>
+      
       <!-- Dynamic Table Container -->
       <div id="dynamic-table-area">
         <div class="no-selections-message">Select at least one option to generate the table</div>
       </div>
       
-      <!-- PDF Preview -->
-      <div id="pdf-preview" class="pdf-preview"></div>
+      <!-- Hidden Input Fields - These will be used to pass data to Jotform -->
+      <div id="hidden-fields" class="hidden-fields"></div>
     </div>
     
     <script>
@@ -146,7 +151,6 @@
         // If no options are selected, show message
         if (selectedOptions.length === 0) {
           tableArea.innerHTML = '<div class="no-selections-message">Select at least one option to generate the table</div>';
-          document.getElementById("pdf-preview").style.display = "none";
           return;
         }
         
@@ -181,51 +185,30 @@
         tableHTML += '</table>';
         tableArea.innerHTML = tableHTML;
         
-        // Update PDF friendly preview
-        updatePDFPreview(selectedOptions);
+        // Update hidden fields for better PDF support
+        updateHiddenFields(selectedOptions);
       }
       
-      // Create PDF friendly format
-      function updatePDFPreview(selectedOptions) {
-        var previewElement = document.getElementById("pdf-preview");
+      // Update hidden fields that will be used for PDF mapping
+      function updateHiddenFields(selectedOptions) {
+        var hiddenFieldsContainer = document.getElementById("hidden-fields");
+        hiddenFieldsContainer.innerHTML = '';
         
-        if (selectedOptions.length === 0) {
-          previewElement.style.display = "none";
-          return;
-        }
-        
-        // Create a formatted text table that's PDF friendly
-        var textTable = "SELECTION TABLE\n";
-        textTable += "==============\n\n";
-        
-        // Add the header row with proper spacing
-        textTable += "Location  ";
-        selectedOptions.forEach(function(option) {
-          textTable += " | " + option.padEnd(10);
-        });
-        textTable += "\n";
-        
-        // Add a separator line
-        textTable += "---------";
-        selectedOptions.forEach(function() {
-          textTable += "-+-----------";
-        });
-        textTable += "\n";
-        
-        // Add rows
+        // Create hidden fields for each cell in the table
         tableRows.forEach(function(row) {
-          textTable += row.padEnd(10);
-          
           selectedOptions.forEach(function(option) {
-            var checkValue = tableValues[row][option] === 1 ? "☑" : "☐";
-            textTable += " | " + checkValue + "          ";
+            var fieldId = row + '_' + option;
+            var fieldValue = tableValues[row][option] === 1 ? 'Yes' : 'No';
+            
+            var hiddenField = document.createElement('input');
+            hiddenField.type = 'hidden';
+            hiddenField.id = fieldId;
+            hiddenField.name = fieldId;
+            hiddenField.value = fieldValue;
+            
+            hiddenFieldsContainer.appendChild(hiddenField);
           });
-          
-          textTable += "\n";
         });
-        
-        previewElement.textContent = textTable;
-        previewElement.style.display = "block";
       }
       
       // Toggle cell checkbox in the table
@@ -250,54 +233,6 @@
         updateDynamicTable();
       }
       
-      // Create a formatted text representation of the table
-      function createFormattedTable() {
-        var selectedOptions = [];
-        
-        // Get selected options
-        for (var option in checkboxState) {
-          if (checkboxState[option] === 1) {
-            selectedOptions.push(option);
-          }
-        }
-        
-        if (selectedOptions.length === 0) {
-          return "No options selected";
-        }
-        
-        // Create a formatted text table
-        var textTable = "SELECTION TABLE\n";
-        textTable += "==============\n\n";
-        
-        // Add the header row with proper spacing
-        textTable += "Location  ";
-        selectedOptions.forEach(function(option) {
-          textTable += " | " + option.padEnd(10);
-        });
-        textTable += "\n";
-        
-        // Add a separator line
-        textTable += "---------";
-        selectedOptions.forEach(function() {
-          textTable += "-+-----------";
-        });
-        textTable += "\n";
-        
-        // Add rows
-        tableRows.forEach(function(row) {
-          textTable += row.padEnd(10);
-          
-          selectedOptions.forEach(function(option) {
-            var checkValue = tableValues[row][option] === 1 ? "☑" : "☐";
-            textTable += " | " + checkValue + "          ";
-          });
-          
-          textTable += "\n";
-        });
-        
-        return textTable;
-      }
-      
       // Initialize the widget
       JFCustomWidget.subscribe("ready", function() {
         // Set up listeners for each individual checkbox
@@ -320,15 +255,44 @@
         });
       });
       
+      // Create a structured data object for submission
+      function createStructuredData() {
+        var result = {
+          tableData: {},
+          hiddenFields: {}
+        };
+        
+        // Get selected options
+        var selectedOptions = [];
+        for (var option in checkboxState) {
+          if (checkboxState[option] === 1) {
+            selectedOptions.push(option);
+          }
+        }
+        
+        // Add table data
+        tableRows.forEach(function(row) {
+          result.tableData[row] = {};
+          selectedOptions.forEach(function(option) {
+            var value = tableValues[row][option] === 1 ? 'Yes' : 'No';
+            result.tableData[row][option] = value;
+            
+            // Also add to hidden fields in a format good for PDF mapping
+            var fieldId = row + '_' + option;
+            result.hiddenFields[fieldId] = value;
+          });
+        });
+        
+        return result;
+      }
+      
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
-        // Create a text-based formatted table representation
-        var formattedTable = createFormattedTable();
+        var data = createStructuredData();
         
-        // Send the formatted table
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: formattedTable
+          value: JSON.stringify(data)
         });
       });
     </script>
