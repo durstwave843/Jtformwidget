@@ -2,33 +2,40 @@
 <html>
   <head>
     <meta charset="utf-8"/>
-    <!-- Load the Custom Widget API immediately -->
+
+    <!-- 1) Load the Widget API immediately -->
     <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+    <!-- 2) Wire up READY + SUBMIT in one clean block -->
     <script>
-        console.log("🏁 widget HTML loaded");
-  JFCustomWidget.subscribe("ready", () => {
-    console.log("🔔 widget ready fired");
-      // 1) Catch JotForm's "ready" event as early as possible
+      // confirm our code is actually running
+      console.log("🏁 widget HTML loaded");
+
+      // fire as soon as JotForm sends the 'ready' event
       JFCustomWidget.subscribe("ready", function() {
-        // Show "Working" in the widget UI
+        console.log("🔔 widget ready fired");
+
+        // show "Working" in the UI
         document.getElementById("status").textContent = "Working";
 
-        // 2) Listen for changes on the JotForm field named "typeA"
+        // listen for changes on the JotForm field named "typeA"
         JFCustomWidget.listenFromField("typeA", "change", function(value) {
           console.log("typeA selection →", value);
         });
       });
 
-      // 3) Always send something valid back on submit
+      // always send a valid response on submit
       JFCustomWidget.subscribe("submit", function() {
+        console.log("🔔 widget submit fired");
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: ""  // no real data to return
+          value: ""  // or some static value if you want
         });
       });
     </script>
   </head>
-  <body style="font-family:sans-serif; padding:12px;">
+
+  <body style="font-family: sans-serif; padding: 12px;">
     <div id="status">Loading…</div>
   </body>
 </html>
