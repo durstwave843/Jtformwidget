@@ -27,70 +27,7 @@
         padding-bottom: 10px;
       }
       
-      .checkbox-list {
-        margin: 15px 0;
-      }
-      
-      .checkbox-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 8px;
-      }
-      
-      .checkbox-indicator {
-        width: 20px;
-        height: 20px;
-        border: 2px solid #ccc;
-        border-radius: 4px;
-        margin-right: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      
-      .checkbox-indicator.checked {
-        background-color: #4CAF50;
-        border-color: #4CAF50;
-        color: white;
-      }
-      
-      .checkbox-label {
-        font-size: 16px;
-      }
-      
-      .status {
-        font-weight: bold;
-        color: #4CAF50;
-        margin-bottom: 15px;
-      }
-      
-      .all-selections {
-        margin-top: 20px;
-        padding: 10px;
-        background-color: #f5f5f5;
-        border-radius: 4px;
-        font-weight: bold;
-      }
-
-      .debug-info {
-        margin-top: 15px;
-        font-size: 12px;
-        font-family: monospace;
-        color: #666;
-        background-color: #f5f5f5;
-        padding: 8px;
-        border-radius: 4px;
-        max-height: 200px;
-        overflow-y: auto;
-      }
-      
       /* Dynamic Table Styles */
-      .dynamic-table-container {
-        margin-top: 25px;
-        border-top: 1px solid #ddd;
-        padding-top: 15px;
-      }
-      
       .dynamic-table {
         width: 100%;
         border-collapse: collapse;
@@ -143,37 +80,12 @@
   </head>
   <body>
     <div class="container">
-      <h3>Checkbox Selections</h3>
-      <div id="status" class="status">Connecting to form...</div>
-      
-      <div class="checkbox-list">
-        <div class="checkbox-item">
-          <div id="checkbox-0" class="checkbox-indicator">✓</div>
-          <div class="checkbox-label">Asphalt</div>
-        </div>
-        <div class="checkbox-item">
-          <div id="checkbox-1" class="checkbox-indicator">✓</div>
-          <div class="checkbox-label">Metal</div>
-        </div>
-        <div class="checkbox-item">
-          <div id="checkbox-2" class="checkbox-indicator">✓</div>
-          <div class="checkbox-label">Tile</div>
-        </div>
-      </div>
-      
-      <div id="all-selections" class="all-selections">
-        No selections yet
-      </div>
+      <h3>Details</h3>
       
       <!-- Dynamic Table Container -->
-      <div class="dynamic-table-container">
-        <h3>Detail Information</h3>
-        <div id="dynamic-table-area">
-          <div class="no-selections-message">Select at least one option above to generate the table</div>
-        </div>
+      <div id="dynamic-table-area">
+        <div class="no-selections-message">Select at least one option to generate the table</div>
       </div>
-      
-      <div id="debug-info" class="debug-info"></div>
     </div>
     
     <script>
@@ -198,58 +110,10 @@
             tableValues[row][option] = 0; // 0 = unchecked, 1 = checked
           }
         });
-        log("Table values initialized");
       }
       
       // Call initialization once
       initTableValues();
-      
-      // Log events for debugging
-      function log(message) {
-        var debugElement = document.getElementById("debug-info");
-        var time = new Date().toTimeString().split(' ')[0];
-        debugElement.innerHTML = time + ": " + message + "<br>" + debugElement.innerHTML;
-      }
-      
-      // Update the visual checkbox indicators
-      function updateCheckboxDisplay() {
-        // Update checkboxes
-        updateCheckbox(0, "Asphalt");
-        updateCheckbox(1, "Metal");
-        updateCheckbox(2, "Tile");
-        
-        // Update the selections summary
-        var selections = [];
-        for (var option in checkboxState) {
-          if (checkboxState[option] === 1) {
-            selections.push(option);
-          }
-        }
-        
-        if (selections.length > 0) {
-          document.getElementById("all-selections").innerHTML = 
-            "Selected: " + selections.join(", ");
-        } else {
-          document.getElementById("all-selections").innerHTML = 
-            "No selections yet";
-        }
-        
-        // Update the dynamic table based on selections
-        updateDynamicTable();
-      }
-      
-      // Update a single checkbox indicator
-      function updateCheckbox(index, name) {
-        var indicator = document.getElementById("checkbox-" + index);
-        
-        if (checkboxState[name] === 1) {
-          indicator.className = "checkbox-indicator checked";
-          indicator.innerHTML = "✓";
-        } else {
-          indicator.className = "checkbox-indicator";
-          indicator.innerHTML = "";
-        }
-      }
       
       // Update the dynamic table
       function updateDynamicTable() {
@@ -265,7 +129,7 @@
         
         // If no options are selected, show message
         if (selectedOptions.length === 0) {
-          tableArea.innerHTML = '<div class="no-selections-message">Select at least one option above to generate the table</div>';
+          tableArea.innerHTML = '<div class="no-selections-message">Select at least one option to generate the table</div>';
           return;
         }
         
@@ -305,7 +169,6 @@
       function toggleTableCheckbox(row, option) {
         // Toggle value: 0 to 1, or 1 to 0
         tableValues[row][option] = tableValues[row][option] === 0 ? 1 : 0;
-        log("Toggled " + row + " - " + option + " to " + tableValues[row][option]);
         
         // Update the table display
         updateDynamicTable();
@@ -313,26 +176,19 @@
       
       // Handle checkbox changes - toggle state when event is received
       function handleCheckboxEvent(checkboxName) {
-        log("Received event for " + checkboxName);
-        
         // Toggle the state (0 to 1, or 1 to 0)
         if (checkboxState[checkboxName] === 0) {
-          log("Setting " + checkboxName + " to checked");
           checkboxState[checkboxName] = 1;
         } else {
-          log("Setting " + checkboxName + " to unchecked");
           checkboxState[checkboxName] = 0;
         }
         
-        // Update the display
-        updateCheckboxDisplay();
+        // Update the dynamic table
+        updateDynamicTable();
       }
       
       // Initialize the widget
       JFCustomWidget.subscribe("ready", function() {
-        document.getElementById("status").innerHTML = "Connected to form";
-        log("Widget ready");
-        
         // Set up listeners for each individual checkbox
         JFCustomWidget.listenFromField("input_3_0", "change", function(value) {
           if (value === "Asphalt") {
@@ -355,14 +211,6 @@
       
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
-        // Get the selected values as an array
-        var selections = [];
-        for (var option in checkboxState) {
-          if (checkboxState[option] === 1) {
-            selections.push(option);
-          }
-        }
-        
         // Prepare table data for submission
         var tableData = {};
         tableRows.forEach(function(row) {
@@ -374,15 +222,9 @@
           }
         });
         
-        // Combine all data
-        var submitData = {
-          selections: selections.join(", "),
-          table: tableData
-        };
-        
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: JSON.stringify(submitData)
+          value: JSON.stringify(tableData)
         });
       });
     </script>
