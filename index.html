@@ -14,7 +14,7 @@
       .container {
         background: white;
         border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         padding: 15px;
         margin-bottom: 15px;
       }
@@ -26,192 +26,217 @@
         padding-bottom: 10px;
       }
       
-      .value-display {
-        background: #f5f5f5;
-        border: 1px solid #ddd;
-        padding: 10px;
-        border-radius: 4px;
-        font-family: monospace;
-        margin: 10px 0;
-        min-height: 20px;
+      .checkbox-list {
+        margin: 15px 0;
       }
       
-      .buttons {
-        margin-top: 15px;
+      .checkbox-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
       }
       
-      button {
-        background: #4CAF50;
-        color: white;
-        border: none;
-        padding: 8px 15px;
+      .checkbox-indicator {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ccc;
         border-radius: 4px;
-        cursor: pointer;
         margin-right: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       
-      button:hover {
-        background: #45a049;
+      .checkbox-indicator.checked {
+        background-color: #4CAF50;
+        border-color: #4CAF50;
+        color: white;
       }
       
-      .log {
-        max-height: 200px;
-        overflow-y: auto;
-        font-size: 12px;
+      .checkbox-label {
+        font-size: 16px;
       }
       
       .status {
         font-weight: bold;
         color: #4CAF50;
+        margin-bottom: 15px;
+      }
+      
+      .all-selections {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+
+      .debug-info {
+        margin-top: 15px;
+        font-size: 12px;
+        font-family: monospace;
+        color: #666;
+        background-color: #f5f5f5;
+        padding: 8px;
+        border-radius: 4px;
+        display: none;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h3>Form Field Monitor</h3>
-      <p>Status: <span id="status" class="status">Connecting...</span></p>
+      <h3>Checkbox Selections</h3>
+      <div id="status" class="status">Connecting to form...</div>
       
-      <div>
-        <strong>Checkbox Field Values:</strong>
-        <div id="checkbox-values" class="value-display">No values yet</div>
+      <div class="checkbox-list">
+        <div class="checkbox-item">
+          <div id="checkbox-0" class="checkbox-indicator">✓</div>
+          <div class="checkbox-label">Asphalt</div>
+        </div>
+        <div class="checkbox-item">
+          <div id="checkbox-1" class="checkbox-indicator">✓</div>
+          <div class="checkbox-label">Metal</div>
+        </div>
+        <div class="checkbox-item">
+          <div id="checkbox-2" class="checkbox-indicator">✓</div>
+          <div class="checkbox-label">Tile</div>
+        </div>
       </div>
       
-      <div>
-        <strong>Text Field Value:</strong>
-        <div id="text-value" class="value-display">No value yet</div>
+      <div id="all-selections" class="all-selections">
+        No selections yet
       </div>
       
-      <div class="buttons">
-        <button id="btn-probe">Probe Form Fields</button>
-        <button id="btn-write">Write to Text Field</button>
-      </div>
-    </div>
-    
-    <div class="container">
-      <h3>Debug Log</h3>
-      <div id="log" class="value-display log"></div>
+      <div id="debug-info" class="debug-info"></div>
     </div>
     
     <script>
-      // Helper to update display
-      function updateDisplay(id, value) {
-        document.getElementById(id).innerHTML = value;
+      // Track the selected checkboxes with a lastValue property
+      var checkboxState = [
+        { name: "Asphalt", selected: false, lastValue: null },
+        { name: "Metal", selected: false, lastValue: null },
+        { name: "Tile", selected: false, lastValue: null }
+      ];
+      
+      // Debug logging - can be enabled if needed
+      var debugMode = false;
+      
+      function debugLog(message) {
+        if (debugMode) {
+          var debugElement = document.getElementById("debug-info");
+          debugElement.style.display = "block";
+          debugElement.innerHTML = message + "<br>" + debugElement.innerHTML;
+        }
       }
       
-      // Helper to log messages
-      function log(message) {
-        var logElement = document.getElementById('log');
-        var time = new Date().toTimeString().split(' ')[0];
-        
-        if (typeof message === 'object') {
-          message = JSON.stringify(message);
+      // Update the visual checkbox indicators
+      function updateCheckboxDisplay() {
+        // Update each checkbox indicator
+        for (var i = 0; i < checkboxState.length; i++) {
+          var indicator = document.getElementById("checkbox-" + i);
+          
+          if (checkboxState[i].selected) {
+            indicator.className = "checkbox-indicator checked";
+            indicator.innerHTML = "✓";
+          } else {
+            indicator.className = "checkbox-indicator";
+            indicator.innerHTML = "";
+          }
         }
         
-        logElement.innerHTML = time + ': ' + message + '<br>' + logElement.innerHTML;
+        // Update the selections summary
+        var selections = checkboxState.filter(function(item) {
+          return item.selected;
+        }).map(function(item) {
+          return item.name;
+        });
+        
+        if (selections.length > 0) {
+          document.getElementById("all-selections").innerHTML = 
+            "Selected: " + selections.join(", ");
+        } else {
+          document.getElementById("all-selections").innerHTML = 
+            "No selections yet";
+        }
       }
       
-      // Initialize widget
-      log('Widget loading...');
-      
-      // Method to check field values in multiple ways
-      function probeFields() {
-        log('Probing fields with multiple methods...');
+      // Handle checkbox changes
+      function handleCheckboxChange(index, value) {
+        // Get checkbox state
+        var checkbox = checkboxState[index];
         
-        // First method: Try getting field values by name
-        JFCustomWidget.getFieldsValueByName(['q3_typeA', 'q10_typeA10'], function(response) {
-          log('getFieldsValueByName response:');
-          log(response);
-        });
+        debugLog("Checkbox " + index + " (" + checkbox.name + ") change: " + value);
         
-        // Second method: Try getting field values by ID
-        JFCustomWidget.getFieldsValueById([3, 10], function(response) {
-          log('getFieldsValueById response:');
-          log(response);
-        });
+        // If we receive a change event with the checkbox name (e.g., "Asphalt"),
+        // that means the checkbox was checked
+        if (value === checkbox.name) {
+          debugLog("Checkbox " + index + " was checked");
+          checkbox.selected = true;
+        } 
+        // If we receive an empty value or a different value, and the checkbox was previously
+        // checked (i.e., the last value was the checkbox name), that means it was unchecked
+        else if (checkbox.lastValue === checkbox.name) {
+          debugLog("Checkbox " + index + " was unchecked");
+          checkbox.selected = false;
+        }
         
-        // Third method: Listen directly to the fields by multiple name formats
-        var possibleNames = ['q3_typeA', 'q3_typeA[]', 'input_3_0', 'input_3_1', 'input_3_2'];
+        // Update the last value
+        checkbox.lastValue = value;
         
-        possibleNames.forEach(function(name) {
-          log('Setting up listener for ' + name);
-          
-          JFCustomWidget.listenFromField(name, 'change', function(value) {
-            log('Change event from ' + name + ':');
-            log(value);
-            updateDisplay('checkbox-values', JSON.stringify(value));
-          });
-        });
-        
-        // Listen to text field by multiple formats
-        var textFieldNames = ['q10_typeA10', 'input_10'];
-        
-        textFieldNames.forEach(function(name) {
-          log('Setting up listener for ' + name);
-          
-          JFCustomWidget.listenFromField(name, 'change', function(value) {
-            log('Change event from ' + name + ':');
-            log(value);
-            updateDisplay('text-value', value);
-          });
-        });
+        // Update the display
+        updateCheckboxDisplay();
       }
       
-      // Method to write to the text field
-      function writeToTextField() {
-        var testValue = "Test value from widget: " + new Date().toLocaleTimeString();
-        log('Attempting to write to text field: ' + testValue);
+      // Initialize the widget
+      JFCustomWidget.subscribe("ready", function() {
+        document.getElementById("status").innerHTML = "Connected to form";
+        debugLog("Widget ready event received");
         
-        // Try to set the value directly
-        JFCustomWidget.storeToField('q10_typeA10', testValue, function(response) {
-          log('storeToField response:');
-          log(response);
-        });
-        
-        // Alternative method
-        JFCustomWidget.setFieldsValueById(10, testValue, function(response) {
-          log('setFieldsValueById response:');
-          log(response);
-        });
-      }
-      
-      // Wait for the JotForm API to be ready
-      JFCustomWidget.subscribe('ready', function() {
-        log('Ready event received!');
-        updateDisplay('status', 'Connected to JotForm');
-        
-        // Set up button event handlers
-        document.getElementById('btn-probe').addEventListener('click', probeFields);
-        document.getElementById('btn-write').addEventListener('click', writeToTextField);
-        
-        // Subscribe to form value changes
-        JFCustomWidget.subscribe('formValueChanged', function(data) {
-          log('Form value changed:');
-          log(data);
-          
-          if (data && data.fieldID) {
-            // Check if it's the checkbox field
-            if (data.fieldID.indexOf('q3_typeA') !== -1) {
-              updateDisplay('checkbox-values', JSON.stringify(data.value));
-            }
+        // Set up listeners for each individual checkbox
+        for (var i = 0; i < checkboxState.length; i++) {
+          (function(index) {
+            var inputId = "input_3_" + index;
+            debugLog("Setting up listener for " + inputId);
             
-            // Check if it's the text field
-            if (data.fieldID.indexOf('q10_typeA10') !== -1 || 
-                data.fieldID.indexOf('input_10') !== -1) {
-              updateDisplay('text-value', data.value);
-            }
-          }
-        });
+            JFCustomWidget.listenFromField(inputId, "change", function(value) {
+              handleCheckboxChange(index, value);
+            });
+          })(i);
+        }
         
-        // Run the probe once after initialization
-        setTimeout(probeFields, 1000);
+        // Check for initial values
+        for (var i = 0; i < checkboxState.length; i++) {
+          (function(index) {
+            var inputId = "input_3_" + index;
+            
+            JFCustomWidget.getFieldsValueByName([inputId], function(response) {
+              debugLog("Initial value for " + inputId + ": " + JSON.stringify(response));
+              
+              if (response && response.data && response.data.length > 0) {
+                var value = response.data[0].value;
+                if (value === checkboxState[index].name) {
+                  checkboxState[index].selected = true;
+                  checkboxState[index].lastValue = value;
+                  updateCheckboxDisplay();
+                }
+              }
+            });
+          })(i);
+        }
       });
       
       // Handle form submission
-      JFCustomWidget.subscribe('submit', function() {
-        log('Submit event received');
+      JFCustomWidget.subscribe("submit", function() {
+        // Get the selected values as an array
+        var selections = checkboxState.filter(function(item) {
+          return item.selected;
+        }).map(function(item) {
+          return item.name;
+        });
+        
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: document.getElementById('text-value').innerHTML
+          value: selections.join(", ")
         });
       });
     </script>
