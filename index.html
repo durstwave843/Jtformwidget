@@ -252,128 +252,6 @@
       
       // Create a formatted text representation of the table
       function createFormattedTable() {
-        var select<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
-    <!-- Add html2canvas library -->
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 15px;
-        background-color: #f9f9f9;
-        margin: 0;
-      }
-      
-      .container {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        padding: 15px;
-        margin-bottom: 15px;
-      }
-      
-      h3 {
-        margin-top: 0;
-        color: #333;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
-      }
-      
-      /* Dynamic Table Styles */
-      .dynamic-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 15px;
-      }
-      
-      .dynamic-table th, .dynamic-table td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: center;
-      }
-      
-      .dynamic-table th {
-        background-color: #f2f2f2;
-        color: #333;
-        font-weight: bold;
-      }
-      
-      .dynamic-table tr td:first-child {
-        background-color: #f8f8f8;
-        font-weight: bold;
-        text-align: left;
-      }
-      
-      .no-selections-message {
-        color: #888;
-        font-style: italic;
-        margin: 20px 0;
-      }
-      
-      /* Table cell checkbox styles */
-      .table-checkbox {
-        width: 20px;
-        height: 20px;
-        border: 2px solid #ccc;
-        border-radius: 4px;
-        margin: 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-      }
-      
-      .table-checkbox.checked {
-        background-color: #4CAF50;
-        border-color: #4CAF50;
-        color: white;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h3>Details</h3>
-      
-      <!-- Dynamic Table Container -->
-      <div id="dynamic-table-area">
-        <div class="no-selections-message">Select at least one option to generate the table</div>
-      </div>
-    </div>
-    
-    <script>
-      // Track the state of each checkbox (0 = unchecked, 1 = checked)
-      var checkboxState = {
-        "Asphalt": 0,
-        "Metal": 0,
-        "Tile": 0
-      };
-      
-      // Fixed rows for the table
-      var tableRows = ["Home", "Barn", "Garage"];
-      
-      // Store values in the dynamic table (3D object: row > column > checked state)
-      var tableValues = {};
-      
-      // Initialize table values
-      function initTableValues() {
-        tableRows.forEach(function(row) {
-          tableValues[row] = {};
-          for (var option in checkboxState) {
-            tableValues[row][option] = 0; // 0 = unchecked, 1 = checked
-          }
-        });
-      }
-      
-      // Call initialization once
-      initTableValues();
-      
-      // Update the dynamic table
-      function updateDynamicTable() {
-        var tableArea = document.getElementById("dynamic-table-area");
         var selectedOptions = [];
         
         // Get selected options
@@ -383,88 +261,41 @@
           }
         }
         
-        // If no options are selected, show message
         if (selectedOptions.length === 0) {
-          tableArea.innerHTML = '<div class="no-selections-message">Select at least one option to generate the table</div>';
-          return;
+          return "No options selected";
         }
         
-        // Build the table
-        var tableHTML = '<table id="selectionTable" class="dynamic-table">';
+        // Create a formatted text table
+        var textTable = "SELECTION TABLE\n";
+        textTable += "==============\n\n";
         
-        // Table header
-        tableHTML += '<tr><th>Location</th>';
+        // Add the header row with proper spacing
+        textTable += "Location  ";
         selectedOptions.forEach(function(option) {
-          tableHTML += '<th>' + option + '</th>';
+          textTable += " | " + option.padEnd(10);
         });
-        tableHTML += '</tr>';
+        textTable += "\n";
         
-        // Table rows
+        // Add a separator line
+        textTable += "---------";
+        selectedOptions.forEach(function() {
+          textTable += "-+-----------";
+        });
+        textTable += "\n";
+        
+        // Add rows
         tableRows.forEach(function(row) {
-          tableHTML += '<tr><td>' + row + '</td>';
+          textTable += row.padEnd(10);
           
           selectedOptions.forEach(function(option) {
-            var isChecked = tableValues[row][option] === 1;
-            var checkboxClass = isChecked ? "table-checkbox checked" : "table-checkbox";
-            var checkmark = isChecked ? "✓" : "";
-            
-            tableHTML += '<td>' +
-              '<div class="' + checkboxClass + '" ' +
-              'onclick="toggleTableCheckbox(\'' + row + '\', \'' + option + '\')">' +
-              checkmark + '</div></td>';
+            var checkValue = tableValues[row][option] === 1 ? "☑" : "☐";
+            textTable += " | " + checkValue + "          ";
           });
           
-          tableHTML += '</tr>';
+          textTable += "\n";
         });
         
-        tableHTML += '</table>';
-        tableArea.innerHTML = tableHTML;
-      }
-      
-      // Toggle cell checkbox in the table
-      function toggleTableCheckbox(row, option) {
-        // Toggle value: 0 to 1, or 1 to 0
-        tableValues[row][option] = tableValues[row][option] === 0 ? 1 : 0;
-        
-        // Update the table display
-        updateDynamicTable();
-      }
-      
-      // Handle checkbox changes - toggle state when event is received
-      function handleCheckboxEvent(checkboxName) {
-        // Toggle the state (0 to 1, or 1 to 0)
-        if (checkboxState[checkboxName] === 0) {
-          checkboxState[checkboxName] = 1;
-        } else {
-          checkboxState[checkboxName] = 0;
-        }
-        
-        // Update the dynamic table
-        updateDynamicTable();
-      }
-      
-      // Function to capture table as image
-      async function captureTableAsImage() {
-        const tableElement = document.getElementById('selectionTable');
-        
-        if (!tableElement) {
-          return null; // No table to capture
-        }
-        
-        try {
-          // Create canvas from table element
-          const canvas = await html2canvas(tableElement, {
-            backgroundColor: "#ffffff",
-            scale: 2, // Higher scale for better quality
-            logging: false
-          });
-          
-          // Convert canvas to data URL (PNG image)
-          return canvas.toDataURL("image/png");
-        } catch (error) {
-          console.error("Error capturing table:", error);
-          return null;
-        }
+        return textTable;
       }
       
       // Initialize the widget
@@ -490,28 +321,14 @@
       });
       
       // Handle form submission
-      JFCustomWidget.subscribe("submit", async function() {
-        // Capture the table as an image
-        const tableImage = await captureTableAsImage();
+      JFCustomWidget.subscribe("submit", function() {
+        // Create a text-based formatted table representation
+        var formattedTable = createFormattedTable();
         
-        // Prepare regular table data as fallback
-        var tableData = {};
-        tableRows.forEach(function(row) {
-          tableData[row] = {};
-          for (var option in checkboxState) {
-            if (checkboxState[option] === 1) { // Only include selected options
-              tableData[row][option] = tableValues[row][option] === 1 ? "Yes" : "No";
-            }
-          }
-        });
-        
-        // Send both the image and the table data
+        // Send the formatted table
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: JSON.stringify({
-            tableData: tableData,
-            tableImage: tableImage
-          })
+          value: formattedTable
         });
       });
     </script>
