@@ -12,144 +12,123 @@
         console.log("🔔 widget ready fired");
         document.getElementById("status").textContent = "Connected to JotForm";
         
-        // Get the widget's configuration data
-        var widgetData = JFCustomWidget.getWidgetSettings();
-        console.log("Widget settings:", widgetData);
-        
-        // Get field question ID from URL parameters
+        // Get question ID from URL parameters
         var urlParams = new URLSearchParams(window.location.search);
         var qid = urlParams.get('qid');
-        console.log("Question ID from URL:", qid);
+        console.log("Widget question ID:", qid);
         
-        // Special handling required for checkbox groups
-        // We need to monitor the entire form values
-        JFCustomWidget.subscribe("formData", function(formData) {
-          console.log("📝 Initial form data:", formData);
-          if (formData && formData.formData) {
-            processFormData(formData.formData);
-          }
+        // Target the piped text field with name typeA10
+        var targetFieldNames = [
+          "typeA10",               // Basic field name
+          "q" + qid + "_typeA10",  // With question ID
+          "input_typeA10",         // Input prefix
+          "input_" + qid           // Input with question ID
+        ];
+        
+        console.log("Will try these field names:", targetFieldNames);
+        
+        // Listen for initial form data
+        JFCustomWidget.getFormData(function(data) {
+          console.log("Initial form data:", data);
         });
         
-        // This captures ALL form value changes - crucial for checkbox groups
-        JFCustomWidget.subscribe("formValueChanged", function(data) {
-          console.log("📊 Form value changed event:", data);
+        // Set up listeners for each possible field name
+        targetFieldNames.forEach(function(fieldName) {
+          console.log("Setting up listener for:", fieldName);
           
-          // Get all current form values after a change
+          // Listen for changes to the piped text field
+          JFCustomWidget.listenFromField(fieldName, "change", function(value) {
+            console.log("✅ Field change detected on " + fieldName + ":", value);
+            processTextFieldValue(fieldName, value);
+          });
+        });
+        
+        // Also listen for form value changes to catch the piped field
+        JFCustomWidget.subscribe("formValueChanged", function(data) {
+          console.log("Form value changed:", data);
+          
+          if (data && data.fieldID) {
+            // Check if the changed field matches any of our target names
+            var isTargetField = targetFieldNames.some(function(name) {
+              return data.fieldID.includes(name);
+            });
+            
+            if (isTargetField) {
+              console.log("✅ Target field changed:", data.fieldID, "=", data.value);
+              processTextFieldValue(data.fieldID, data.value);
+            }
+          }
+          
+          // As a fallback, get all values
           JFCustomWidget.getAllFormValues(function(response) {
-            console.log("🔄 All form values after change:", response);
             if (response && response.formData) {
-              processFormData(response.formData);
+              console.log("All form values:", response.formData);
+              
+              // Look for our field in all form data
+              for (var key in response.formData) {
+                var isTargetField = targetFieldNames.some(function(name) {
+                  return key.includes(name);
+                });
+                
+                if (isTargetField) {
+                  console.log("✅ Found target field in form data:", key, "=", response.formData[key]);
+                  processTextFieldValue(key, response.formData[key]);
+                }
+              }
             }
           });
         });
         
-        // Function to find and extract checkbox values from form data
-        function processFormData(formData) {
-          console.log("Processing form data:", formData);
-          
-          // Checkboxes in JotForm are often in this format
-          var possibleFieldNames = [
-            "typeA",                  // Base name
-            "q" + qid + "_typeA",     // With question ID prefix
-            "input_" + qid + "_0",    // First checkbox in group
-            qid + "_typeA"            // Alternative format
-          ];
-          
-          // Loop through the form data and look for our field
-          var checkboxValues = [];
-          var fieldFound = false;
-          
-          for (var fieldName in formData) {
-            console.log("Checking field:", fieldName);
-            
-            // Check if field name contains any of our possible names
-            var matchesTarget = possibleFieldNames.some(function(name) {
-              return fieldName.includes(name);
-            });
-            
-            if (matchesTarget) {
-              fieldFound = true;
-              console.log("✅ Found matching field:", fieldName, "=", formData[fieldName]);
-              
-              // Handle single value case
-              if (typeof formData[fieldName] === 'string') {
-                // For checkbox groups, JotForm often returns comma-separated values
-                checkboxValues = formData[fieldName].split(',').map(function(item) {
-                  return item.trim();
-                }).filter(function(item) {
-                  return item !== '';
-                });
-              } 
-              // Handle array case
-              else if (Array.isArray(formData[fieldName])) {
-                checkboxValues = formData[fieldName];
-              }
-              
-              // Display the values
-              updateFieldDisplay(fieldName, checkboxValues);
-            }
-            
-            // Also check if this could be a specific checkbox in the group
-            if (fieldName.match(/typeA_\d+/) || fieldName.match(/q\d+_typeA_\d+/)) {
-              var isChecked = formData[fieldName] === 'Yes' || formData[fieldName] === true || formData[fieldName] === 1;
-              if (isChecked) {
-                console.log("✅ Individual checkbox checked:", fieldName);
-                fieldFound = true;
-                
-                // Extract the option value (usually the last part after underscore)
-                var optionValue = fieldName.split('_').pop();
-                if (!checkboxValues.includes(optionValue)) {
-                  checkboxValues.push(optionValue);
-                }
-                
-                updateFieldDisplay(fieldName, checkboxValues);
-              }
-            }
+        // Process the comma-separated text value from the field
+        function processTextFieldValue(fieldName, value) {
+          if (!value) {
+            updateDisplay("No checkboxes selected", []);
+            return;
           }
           
-          // If we didn't find the field, update UI to show that
-          if (!fieldFound) {
-            document.getElementById("fieldStatus").style.display = "block";
-            document.getElementById("fieldStatus").innerHTML = 
-              "<strong>No matching checkbox field found.</strong><br>" +
-              "Searched for: " + possibleFieldNames.join(", ") + "<br>" +
-              "Available fields: " + Object.keys(formData).join(", ");
-          }
+          // Convert to string if it's not already
+          var textValue = String(value);
           
-          // Always display all form values for debugging
-          document.getElementById("allValues").style.display = "block";
-          document.getElementById("allValues").innerHTML = 
-            "<strong>All form values:</strong><br>" + 
-            "<pre>" + JSON.stringify(formData, null, 2) + "</pre>";
+          // Split by comma and trim each value
+          var selectedValues = textValue.split(',').map(function(item) {
+            return item.trim();
+          }).filter(function(item) {
+            return item !== '';
+          });
+          
+          // Update the display
+          updateDisplay("Selections from " + fieldName, selectedValues);
+          
+          // Log the parsed values
+          console.log("Parsed checkbox values:", selectedValues);
         }
         
-        // Helper function to update the display with checkbox values
-        function updateFieldDisplay(fieldName, values) {
-          if (values && values.length > 0) {
-            document.getElementById("fieldStatus").style.display = "block";
-            document.getElementById("fieldStatus").innerHTML = 
-              "<strong>Checkbox values for " + fieldName + ":</strong><br>" +
-              "<ul>" + 
+        // Update the display with the checkbox values
+        function updateDisplay(title, values) {
+          var html = "<strong>" + title + ":</strong>";
+          
+          if (values.length > 0) {
+            html += "<ul>" + 
               values.map(function(val) {
                 return "<li>" + val + "</li>";
               }).join("") + 
               "</ul>";
-            
-            console.log("✅ Checkbox values:", values);
           } else {
-            document.getElementById("fieldStatus").style.display = "block";
-            document.getElementById("fieldStatus").innerHTML = 
-              "<strong>Field " + fieldName + " found but no checkboxes selected.</strong>";
+            html += "<p>No items selected</p>";
           }
+          
+          document.getElementById("fieldStatus").style.display = "block";
+          document.getElementById("fieldStatus").innerHTML = html;
         }
       });
       
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
         console.log("🔔 widget submit fired");
+        var fieldContent = document.getElementById("fieldStatus").innerHTML || "No selection";
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: document.getElementById("fieldStatus").textContent || "No selection"
+          value: fieldContent
         });
       });
     </script>
@@ -173,36 +152,20 @@
         word-break: break-all;
         display: none;
       }
-      #allValues {
-        padding: 8px;
-        background-color: #f9f9f9;
-        border-left: 4px solid #999;
-        margin: 10px 0;
-        word-break: break-all;
-        display: none;
-        font-size: 12px;
-        max-height: 200px;
-        overflow-y: auto;
-      }
-      pre {
-        white-space: pre-wrap;
-        margin: 0;
+      ul {
+        margin: 5px 0;
+        padding-left: 20px;
       }
       .note {
         font-size: 12px;
         color: #666;
         margin-top: 12px;
       }
-      ul {
-        margin: 5px 0;
-        padding-left: 20px;
-      }
     </style>
   </head>
   <body>
     <div id="status">Loading…</div>
     <div id="fieldStatus" style="display:none;"></div>
-    <div id="allValues" style="display:none;"></div>
-    <div class="note">This widget is monitoring checkbox group changes. Check your browser console (F12) for detailed logs.</div>
+    <div class="note">This widget is monitoring the piped text field {typeA10}. Check your browser console (F12) for detailed logs.</div>
   </body>
 </html>
