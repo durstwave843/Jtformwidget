@@ -5,6 +5,9 @@
     <!-- Load the Custom Widget API immediately -->
     <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
     <script>
+        console.log("🏁 widget HTML loaded");
+  JFCustomWidget.subscribe("ready", () => {
+    console.log("🔔 widget ready fired");
       // 1) Catch JotForm's "ready" event as early as possible
       JFCustomWidget.subscribe("ready", function() {
         // Show "Working" in the widget UI
