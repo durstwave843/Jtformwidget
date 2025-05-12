@@ -27,11 +27,6 @@
         
         console.log("Will try these field names:", targetFieldNames);
         
-        // Listen for initial form data
-        JFCustomWidget.getFormData(function(data) {
-          console.log("Initial form data:", data);
-        });
-        
         // Set up listeners for each possible field name
         targetFieldNames.forEach(function(fieldName) {
           console.log("Setting up listener for:", fieldName);
@@ -58,26 +53,34 @@
               processTextFieldValue(data.fieldID, data.value);
             }
           }
-          
-          // As a fallback, get all values
-          JFCustomWidget.getAllFormValues(function(response) {
-            if (response && response.formData) {
-              console.log("All form values:", response.formData);
-              
-              // Look for our field in all form data
-              for (var key in response.formData) {
-                var isTargetField = targetFieldNames.some(function(name) {
-                  return key.includes(name);
-                });
-                
-                if (isTargetField) {
-                  console.log("✅ Found target field in form data:", key, "=", response.formData[key]);
-                  processTextFieldValue(key, response.formData[key]);
-                }
-              }
-            }
-          });
         });
+        
+        // Fall back to polling if event-based approaches don't work
+        var pollCount = 0;
+        var maxPolls = 30;
+        
+        var pollInterval = setInterval(function() {
+          pollCount++;
+          console.log("Polling attempt #" + pollCount);
+          
+          if (pollCount > maxPolls) {
+            clearInterval(pollInterval);
+            console.log("Stopped polling after " + maxPolls + " attempts");
+            return;
+          }
+          
+          targetFieldNames.forEach(function(fieldName) {
+            // Use getFieldsValueByName which is documented and should work
+            JFCustomWidget.getFieldsValueByName(fieldName, function(response) {
+              console.log("Polling result for " + fieldName + ":", response);
+              
+              // Check if we got any usable data
+              if (response && response.data !== undefined) {
+                processTextFieldValue(fieldName, response.data);
+              }
+            });
+          });
+        }, 2000); // Poll every 2 seconds
         
         // Process the comma-separated text value from the field
         function processTextFieldValue(fieldName, value) {
