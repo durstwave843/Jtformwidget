@@ -158,12 +158,6 @@
       <div id="visual-table-area" style="display: none;">
         <!-- This will contain a HTML table that mimics a chart -->
       </div>
-
-      <!-- Debug area to show which values are being passed -->
-      <div id="debug-area" style="margin-top: 20px; padding: 10px; background-color: #f0f0f0; display: none;">
-        <h4>Values Being Passed to Other Questions:</h4>
-        <pre id="debug-values"></pre>
-      </div>
     </div>
     
     <script>
@@ -181,8 +175,7 @@
       var tableValues = {};
       
       // Hard-coded values to pass to other questions in the form
-      // Format: {location: {material: valueToPass}}
-      var hardCodedValues = {
+      var materialCodes = {
         "Home": {
           "Asphalt": "HA-100",
           "Metal": "HM-250",
@@ -197,26 +190,6 @@
           "Asphalt": "GA-200",
           "Metal": "GM-450",
           "Tile": "GT-500"
-        }
-      };
-      
-      // Target question IDs to pass values to
-      // These should be the actual question IDs in your JotForm
-      var targetQuestionIDs = {
-        "Home": {
-          "Asphalt": "input_45",
-          "Metal": "input_11",
-          "Tile": "input_12"
-        },
-        "Barn": {
-          "Asphalt": "input_13",
-          "Metal": "input_14",
-          "Tile": "input_15"
-        },
-        "Garage": {
-          "Asphalt": "input_16",
-          "Metal": "input_17",
-          "Tile": "input_18"
         }
       };
       
@@ -289,9 +262,6 @@
         
         // Update the visual table (renders as HTML instead of canvas for better PDF export)
         updateVisualTable(selectedOptions);
-        
-        // Update values passed to other questions
-        updatePassedValues();
       }
       
       // Create a visual table that will render well in PDFs
@@ -319,8 +289,9 @@
             var isChecked = tableValues[row][option] === 1;
             var cellClass = isChecked ? "cell-yes" : "cell-no";
             var value = isChecked ? "YES" : "NO";
+            var code = isChecked ? " (" + materialCodes[row][option] + ")" : "";
             
-            tableHTML += '<td class="' + cellClass + '">' + value + '</td>';
+            tableHTML += '<td class="' + cellClass + '">' + value + code + '</td>';
           });
           
           tableHTML += '</tr>';
@@ -338,74 +309,24 @@
         // Update the table display
         updateDynamicTable();
         
-        // Pass value to specified question in the form
-        passValueToQuestion(row, option);
-      }
-      
-      // Pass a value to another question in the form based on checkbox state
-      function passValueToQuestion(row, option) {
-        var isChecked = tableValues[row][option] === 1;
-        var valueToPass = isChecked ? hardCodedValues[row][option] : "";
-        var targetQuestionID = targetQuestionIDs[row][option];
-        
-        // Use JotForm API to pass the value
-        if (targetQuestionID) {
+        // If checked, pass the material code to the form field with ID input_45
+        if (tableValues[row][option] === 1) {
+          var materialCode = materialCodes[row][option];
+          
+          // EXAMPLE: Send the material code directly to input_45
+          // This will populate the field with ID input_45 with the selected material code
           JFCustomWidget.sendData({
-            [targetQuestionID]: valueToPass
+            "input_45": materialCode
           });
           
-          // For debugging - display the values being passed
-          updateDebugDisplay();
+          // You can also add a console.log to see what's being sent
+          console.log("Sending to input_45: " + materialCode);
+        } else {
+          // If unchecked, you can clear the field or set it to empty
+          JFCustomWidget.sendData({
+            "input_45": ""
+          });
         }
-      }
-      
-      // Update all passed values based on current table state
-      function updatePassedValues() {
-        var dataToSend = {};
-        
-        // Iterate through all cells and set values for checked ones
-        tableRows.forEach(function(row) {
-          for (var option in checkboxState) {
-            if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
-              var targetQuestionID = targetQuestionIDs[row][option];
-              if (targetQuestionID) {
-                dataToSend[targetQuestionID] = hardCodedValues[row][option];
-              }
-            }
-          }
-        });
-        
-        // Send all values at once
-        if (Object.keys(dataToSend).length > 0) {
-          JFCustomWidget.sendData(dataToSend);
-        }
-        
-        // Update debug display
-        updateDebugDisplay();
-      }
-      
-      // Update debug display to show which values are being passed
-      function updateDebugDisplay() {
-        var debugArea = document.getElementById("debug-area");
-        var debugValues = document.getElementById("debug-values");
-        var debugText = "";
-        
-        // Display values being passed
-        tableRows.forEach(function(row) {
-          debugText += row + ":\n";
-          for (var option in checkboxState) {
-            if (checkboxState[option] === 1) {
-              var isChecked = tableValues[row][option] === 1;
-              var value = isChecked ? hardCodedValues[row][option] : "None";
-              var targetID = targetQuestionIDs[row][option];
-              debugText += "  - " + option + ": " + value + " -> " + targetID + "\n";
-            }
-          }
-        });
-        
-        // Show debug area and update text
-        debugArea.style.display = "block";
-        debugValues.textContent = debugText;
       }
       
       // Handle checkbox changes - toggle state when event is received
@@ -457,9 +378,9 @@
             var cellColor = isChecked ? '#e6ffe6' : '#fff0f0';
             var textColor = isChecked ? '#006600' : '#cc0000';
             var value = isChecked ? "YES" : "NO";
-            var hardCodedValue = isChecked ? " (" + hardCodedValues[row][option] + ")" : "";
+            var code = isChecked ? " (" + materialCodes[row][option] + ")" : "";
             
-            htmlOutput += '<td style="background-color: ' + cellColor + '; color: ' + textColor + '; text-align: center;"><strong>' + value + hardCodedValue + '</strong></td>';
+            htmlOutput += '<td style="background-color: ' + cellColor + '; color: ' + textColor + '; text-align: center;"><strong>' + value + code + '</strong></td>';
           });
           
           htmlOutput += '</tr>';
@@ -467,6 +388,37 @@
         
         htmlOutput += '</table>';
         return htmlOutput;
+      }
+      
+      // Pass all current values to form fields on ready
+      function updateFormFields() {
+        // Create an array to store all selected material codes
+        var selectedCodes = [];
+        
+        // Loop through all table values and collect codes for checked cells
+        tableRows.forEach(function(row) {
+          for (var option in checkboxState) {
+            if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
+              selectedCodes.push(materialCodes[row][option]);
+            }
+          }
+        });
+        
+        // Join all selected codes with commas and send to input_45
+        var combinedValue = selectedCodes.join(", ");
+        
+        // Only send if there's data to send
+        if (selectedCodes.length > 0) {
+          JFCustomWidget.sendData({
+            "input_45": combinedValue
+          });
+          console.log("Sending combined values to input_45: " + combinedValue);
+        } else {
+          // Clear the field if nothing is selected
+          JFCustomWidget.sendData({
+            "input_45": ""
+          });
+        }
       }
       
       // Initialize the widget
@@ -493,6 +445,9 @@
       
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
+        // Update all form fields one last time before submitting
+        updateFormFields();
+        
         // Get an HTML representation of the table for better PDF rendering
         var htmlTable = createHTMLTable();
         
