@@ -138,11 +138,19 @@
         background-color: #fff0f0;
         color: #cc0000;
       }
+      
+      /* Output info style */
+      .output-info {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8f8f8;
+        border-left: 4px solid #4CAF50;
+      }
     </style>
   </head>
   <body>
     <div class="container">
-      <h3>Materials Usage V. 2. Table</h3>
+      <h3>Materials Usage Simplify Table</h3>
       
       <!-- Information Message -->
       <div class="info-message">
@@ -157,6 +165,11 @@
       <!-- Visual Table for PDF Export -->
       <div id="visual-table-area" style="display: none;">
         <!-- This will contain a HTML table that mimics a chart -->
+      </div>
+      
+      <!-- Output info -->
+      <div class="output-info">
+        <p>Widget output can be used with JotForm's Conditions feature to pass values to other fields.</p>
       </div>
     </div>
     
@@ -174,7 +187,7 @@
       // Store values in the dynamic table (3D object: row > column > checked state)
       var tableValues = {};
       
-      // Hard-coded values to pass to other questions in the form
+      // Hard-coded values to output to the form
       var materialCodes = {
         "Home": {
           "Asphalt": "HA-100",
@@ -262,6 +275,9 @@
         
         // Update the visual table (renders as HTML instead of canvas for better PDF export)
         updateVisualTable(selectedOptions);
+        
+        // Update widget value whenever table changes
+        updateWidgetValue();
       }
       
       // Create a visual table that will render well in PDFs
@@ -308,29 +324,30 @@
         
         // Update the table display
         updateDynamicTable();
+      }
+      
+      // Update the widget value whenever the table changes
+      function updateWidgetValue() {
+        // Create an array to store all selected material codes
+        var selectedCodes = [];
         
-        // If checked, pass the material code to the form field
-        if (tableValues[row][option] === 1) {
-          var materialCode = materialCodes[row][option];
-          
-          // Try sending with input ID format
-          JFCustomWidget.sendData({
-            "input_45": materialCode
-          });
-          
-          // Also try with the Unique Name format
-          JFCustomWidget.sendData({
-            "typeA45": materialCode
-          });
-          
-          console.log("Sending value to both formats: " + materialCode);
-        } else {
-          // If unchecked, clear the field
-          JFCustomWidget.sendData({
-            "input_45": "",
-            "typeA45": ""
-          });
-        }
+        // Loop through all table values and collect codes for checked cells
+        tableRows.forEach(function(row) {
+          for (var option in checkboxState) {
+            if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
+              selectedCodes.push(materialCodes[row][option]);
+            }
+          }
+        });
+        
+        // Join all selected codes with commas to create a single string value
+        var widgetValue = selectedCodes.join(", ");
+        
+        // Send the value to JotForm as the widget's value
+        // This value can be referenced in JotForm's Conditions
+        JFCustomWidget.sendData({
+          value: widgetValue
+        });
       }
       
       // Handle checkbox changes - toggle state when event is received
@@ -391,15 +408,9 @@
         });
         
         htmlOutput += '</table>';
-        return htmlOutput;
-      }
-      
-      // Pass all current values to form fields on ready
-      function updateFormFields() {
-        // Create an array to store all selected material codes
-        var selectedCodes = [];
         
-        // Loop through all table values and collect codes for checked cells
+        // Add selected codes to the HTML output
+        var selectedCodes = [];
         tableRows.forEach(function(row) {
           for (var option in checkboxState) {
             if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
@@ -408,29 +419,11 @@
           }
         });
         
-        // Join all selected codes with commas
-        var combinedValue = selectedCodes.join(", ");
-        
-        // Try both formats to cover all bases
         if (selectedCodes.length > 0) {
-          // Send to input_45 (Input ID format)
-          JFCustomWidget.sendData({
-            "input_45": combinedValue
-          });
-          
-          // And also to typeA45 (Unique Name format)
-          JFCustomWidget.sendData({
-            "typeA45": combinedValue
-          });
-          
-          console.log("Sending combined values to both formats: " + combinedValue);
-        } else {
-          // Clear the fields if nothing is selected
-          JFCustomWidget.sendData({
-            "input_45": "",
-            "typeA45": ""
-          });
+          htmlOutput += '<p><strong>Selected Material Codes:</strong> ' + selectedCodes.join(", ") + '</p>';
         }
+        
+        return htmlOutput;
       }
       
       // Initialize the widget
@@ -457,8 +450,8 @@
       
       // Handle form submission
       JFCustomWidget.subscribe("submit", function() {
-        // Update all form fields one last time before submitting
-        updateFormFields();
+        // Update widget value one last time before submitting
+        updateWidgetValue();
         
         // Get an HTML representation of the table for better PDF rendering
         var htmlTable = createHTMLTable();
