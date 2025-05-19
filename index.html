@@ -4,8 +4,6 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
-    <!-- Add Chart.js for better PDF rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -87,58 +85,6 @@
         color: white;
       }
       
-      /* Chart Container Styles */
-      .chart-container {
-        margin-top: 25px;
-        padding-top: 15px;
-        border-top: 1px solid #ddd;
-      }
-      
-      .chart-wrapper {
-        position: relative;
-        height: 200px;
-        width: 100%;
-        margin-top: 15px;
-      }
-      
-      /* Visual Table Styles (Chart.js Table Simulation) */
-      .visual-table {
-        width: 100%;
-        margin-top: 20px;
-        border-collapse: collapse;
-      }
-      
-      .visual-table th, .visual-table td {
-        border: 2px solid #333;
-        padding: 8px;
-        text-align: center;
-      }
-      
-      .visual-table th {
-        background-color: #4CAF50;
-        color: white;
-        font-weight: bold;
-      }
-      
-      .visual-table td {
-        font-weight: bold;
-      }
-      
-      .visual-table tr td:first-child {
-        background-color: #f0f0f0;
-        text-align: left;
-      }
-      
-      .cell-yes {
-        background-color: #e6ffe6;
-        color: #006600;
-      }
-      
-      .cell-no {
-        background-color: #fff0f0;
-        color: #cc0000;
-      }
-      
       /* Output info style */
       .output-info {
         margin-top: 20px;
@@ -150,7 +96,7 @@
   </head>
   <body>
     <div class="container">
-      <h3>Materials Usage Table simple v2</h3>
+      <h3>Materials Usage Table</h3>
       
       <!-- Information Message -->
       <div class="info-message">
@@ -160,11 +106,6 @@
       <!-- Dynamic Table Container -->
       <div id="dynamic-table-area">
         <div class="no-selections-message">Select at least one option to generate the table</div>
-      </div>
-      
-      <!-- Visual Table for PDF Export -->
-      <div id="visual-table-area" style="display: none;">
-        <!-- This will contain a HTML table that mimics a chart -->
       </div>
       
       <!-- Output info -->
@@ -187,25 +128,6 @@
       // Store values in the dynamic table (3D object: row > column > checked state)
       var tableValues = {};
       
-      // Hard-coded values to output to the form
-      var materialCodes = {
-        "Home": {
-          "Asphalt": "HA-100",
-          "Metal": "HM-250",
-          "Tile": "HT-350"
-        },
-        "Barn": {
-          "Asphalt": "BA-150",
-          "Metal": "BM-300",
-          "Tile": "BT-400"
-        },
-        "Garage": {
-          "Asphalt": "GA-200",
-          "Metal": "GM-450",
-          "Tile": "GT-500"
-        }
-      };
-      
       // Initialize table values
       function initTableValues() {
         tableRows.forEach(function(row) {
@@ -222,7 +144,6 @@
       // Update the dynamic table
       function updateDynamicTable() {
         var tableArea = document.getElementById("dynamic-table-area");
-        var visualTableArea = document.getElementById("visual-table-area");
         var selectedOptions = [];
         
         // Get selected options
@@ -232,15 +153,11 @@
           }
         }
         
-        // If no options are selected, show message and hide visual table
+        // If no options are selected, show message
         if (selectedOptions.length === 0) {
           tableArea.innerHTML = '<div class="no-selections-message">Select at least one option to generate the table</div>';
-          visualTableArea.style.display = 'none';
           return;
         }
-        
-        // Show visual table
-        visualTableArea.style.display = 'block';
         
         // Build the interactive table
         var tableHTML = '<table id="selectionTable" class="dynamic-table">';
@@ -273,48 +190,8 @@
         tableHTML += '</table>';
         tableArea.innerHTML = tableHTML;
         
-        // Update the visual table (renders as HTML instead of canvas for better PDF export)
-        updateVisualTable(selectedOptions);
-        
         // Update widget value whenever table changes
         updateWidgetValue();
-      }
-      
-      // Create a visual table that will render well in PDFs
-      function updateVisualTable(selectedOptions) {
-        if (selectedOptions.length === 0) return;
-        
-        var visualTableArea = document.getElementById("visual-table-area");
-        
-        // Create a visually distinct HTML table that mimics a chart
-        var tableHTML = '<h4>Materials Usage Chart (PDF Version)</h4>';
-        tableHTML += '<table class="visual-table">';
-        
-        // Table header
-        tableHTML += '<tr><th>Location</th>';
-        selectedOptions.forEach(function(option) {
-          tableHTML += '<th>' + option + '</th>';
-        });
-        tableHTML += '</tr>';
-        
-        // Table rows with colored cells
-        tableRows.forEach(function(row) {
-          tableHTML += '<tr><td>' + row + '</td>';
-          
-          selectedOptions.forEach(function(option) {
-            var isChecked = tableValues[row][option] === 1;
-            var cellClass = isChecked ? "cell-yes" : "cell-no";
-            var value = isChecked ? "YES" : "NO";
-            var code = isChecked ? " (" + materialCodes[row][option] + ")" : "";
-            
-            tableHTML += '<td class="' + cellClass + '">' + value + code + '</td>';
-          });
-          
-          tableHTML += '</tr>';
-        });
-        
-        tableHTML += '</table>';
-        visualTableArea.innerHTML = tableHTML;
       }
       
       // Toggle cell checkbox in the table
@@ -379,92 +256,6 @@
         updateDynamicTable();
       }
       
-      // Create a formatted text representation of the table with HTML for better PDF rendering
-      function createHTMLTable() {
-        var selectedOptions = [];
-        
-        // Get selected options
-        for (var option in checkboxState) {
-          if (checkboxState[option] === 1) {
-            selectedOptions.push(option);
-          }
-        }
-        
-        if (selectedOptions.length === 0) {
-          return "<p>No materials selected</p>";
-        }
-        
-        // Create an HTML table for better PDF rendering
-        var htmlOutput = '<h3>Materials Usage Table</h3>';
-        htmlOutput += '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">';
-        
-        // Table header
-        htmlOutput += '<tr style="background-color: #4CAF50; color: white;"><th>Location</th>';
-        selectedOptions.forEach(function(option) {
-          htmlOutput += '<th>' + option + '</th>';
-        });
-        htmlOutput += '</tr>';
-        
-        // Table rows with colors
-        tableRows.forEach(function(row, index) {
-          var rowColor = index % 2 === 0 ? '#f2f2f2' : 'white';
-          htmlOutput += '<tr style="background-color: ' + rowColor + ';"><td><strong>' + row + '</strong></td>';
-          
-          selectedOptions.forEach(function(option) {
-            var isChecked = tableValues[row][option] === 1;
-            var cellColor = isChecked ? '#e6ffe6' : '#fff0f0';
-            var textColor = isChecked ? '#006600' : '#cc0000';
-            var value = isChecked ? "YES" : "NO";
-            var code = isChecked ? " (" + materialCodes[row][option] + ")" : "";
-            
-            htmlOutput += '<td style="background-color: ' + cellColor + '; color: ' + textColor + '; text-align: center;"><strong>' + value + code + '</strong></td>';
-          });
-          
-          htmlOutput += '</tr>';
-        });
-        
-        htmlOutput += '</table>';
-        
-        // Add grouped materials by location
-        var materialsByLocation = {};
-        
-        // Initialize each location with an empty array
-        tableRows.forEach(function(row) {
-          materialsByLocation[row] = [];
-        });
-        
-        // Collect selected materials for each location
-        tableRows.forEach(function(row) {
-          for (var option in checkboxState) {
-            if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
-              materialsByLocation[row].push(option);
-            }
-          }
-        });
-        
-        // Create formatted strings for each location with selected materials
-        var formattedLocations = [];
-        
-        for (var location in materialsByLocation) {
-          var materials = materialsByLocation[location];
-          if (materials.length > 0) {
-            // Format: "Location: Material1, Material2"
-            formattedLocations.push(location + ": " + materials.join(", "));
-          }
-        }
-        
-        if (formattedLocations.length > 0) {
-          htmlOutput += '<p><strong>Selected Materials:</strong></p>';
-          htmlOutput += '<ul>';
-          formattedLocations.forEach(function(item) {
-            htmlOutput += '<li>' + item + '</li>';
-          });
-          htmlOutput += '</ul>';
-        }
-        
-        return htmlOutput;
-      }
-      
       // Initialize the widget
       JFCustomWidget.subscribe("ready", function() {
         // Set up listeners for each individual checkbox
@@ -492,13 +283,42 @@
         // Update widget value one last time before submitting
         updateWidgetValue();
         
-        // Get an HTML representation of the table for better PDF rendering
-        var htmlTable = createHTMLTable();
+        // Just return the formatted value on submit
+        var formattedValue = "";
         
-        // Submit the HTML table to Jotform
+        // Create an object to group materials by location
+        var materialsByLocation = {};
+        
+        // Initialize each location with an empty array
+        tableRows.forEach(function(row) {
+          materialsByLocation[row] = [];
+        });
+        
+        // Collect selected materials for each location
+        tableRows.forEach(function(row) {
+          for (var option in checkboxState) {
+            if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
+              materialsByLocation[row].push(option);
+            }
+          }
+        });
+        
+        // Create formatted strings for each location with selected materials
+        var formattedLocations = [];
+        
+        for (var location in materialsByLocation) {
+          var materials = materialsByLocation[location];
+          if (materials.length > 0) {
+            formattedLocations.push(location + ": " + materials.join(", "));
+          }
+        }
+        
+        formattedValue = formattedLocations.join("; ");
+        
+        // Submit the value to Jotform
         JFCustomWidget.sendSubmit({
           valid: true,
-          value: htmlTable
+          value: formattedValue
         });
       });
     </script>
