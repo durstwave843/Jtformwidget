@@ -150,7 +150,7 @@
   </head>
   <body>
     <div class="container">
-      <h3>Materials Usage Simplify Table</h3>
+      <h3>Materials Usage Table simple v2</h3>
       
       <!-- Information Message -->
       <div class="info-message">
@@ -328,20 +328,36 @@
       
       // Update the widget value whenever the table changes
       function updateWidgetValue() {
-        // Create an array to store all selected material codes
-        var selectedCodes = [];
+        // Create an object to group materials by location
+        var materialsByLocation = {};
         
-        // Loop through all table values and collect codes for checked cells
+        // Initialize each location with an empty array
+        tableRows.forEach(function(row) {
+          materialsByLocation[row] = [];
+        });
+        
+        // Collect selected materials for each location
         tableRows.forEach(function(row) {
           for (var option in checkboxState) {
             if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
-              selectedCodes.push(materialCodes[row][option]);
+              materialsByLocation[row].push(option);
             }
           }
         });
         
-        // Join all selected codes with commas to create a single string value
-        var widgetValue = selectedCodes.join(", ");
+        // Create formatted strings for each location with selected materials
+        var formattedLocations = [];
+        
+        for (var location in materialsByLocation) {
+          var materials = materialsByLocation[location];
+          if (materials.length > 0) {
+            // Format: "Location: Material1, Material2"
+            formattedLocations.push(location + ": " + materials.join(", "));
+          }
+        }
+        
+        // Join all formatted locations with semicolons
+        var widgetValue = formattedLocations.join("; ");
         
         // Send the value to JotForm as the widget's value
         // This value can be referenced in JotForm's Conditions
@@ -409,18 +425,41 @@
         
         htmlOutput += '</table>';
         
-        // Add selected codes to the HTML output
-        var selectedCodes = [];
+        // Add grouped materials by location
+        var materialsByLocation = {};
+        
+        // Initialize each location with an empty array
+        tableRows.forEach(function(row) {
+          materialsByLocation[row] = [];
+        });
+        
+        // Collect selected materials for each location
         tableRows.forEach(function(row) {
           for (var option in checkboxState) {
             if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
-              selectedCodes.push(materialCodes[row][option]);
+              materialsByLocation[row].push(option);
             }
           }
         });
         
-        if (selectedCodes.length > 0) {
-          htmlOutput += '<p><strong>Selected Material Codes:</strong> ' + selectedCodes.join(", ") + '</p>';
+        // Create formatted strings for each location with selected materials
+        var formattedLocations = [];
+        
+        for (var location in materialsByLocation) {
+          var materials = materialsByLocation[location];
+          if (materials.length > 0) {
+            // Format: "Location: Material1, Material2"
+            formattedLocations.push(location + ": " + materials.join(", "));
+          }
+        }
+        
+        if (formattedLocations.length > 0) {
+          htmlOutput += '<p><strong>Selected Materials:</strong></p>';
+          htmlOutput += '<ul>';
+          formattedLocations.forEach(function(item) {
+            htmlOutput += '<li>' + item + '</li>';
+          });
+          htmlOutput += '</ul>';
         }
         
         return htmlOutput;
