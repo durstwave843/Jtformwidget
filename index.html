@@ -142,7 +142,7 @@
   </head>
   <body>
     <div class="container">
-      <h3>Materials Usage Table</h3>
+      <h3>Materials Usage V. 2. Table</h3>
       
       <!-- Information Message -->
       <div class="info-message">
@@ -309,19 +309,25 @@
         // Update the table display
         updateDynamicTable();
         
-        // If checked, pass the material code to the form field with Unique Name "typeA45"
+        // If checked, pass the material code to the form field
         if (tableValues[row][option] === 1) {
           var materialCode = materialCodes[row][option];
           
-          // Send the material code to the field with Unique Name "typeA45"
+          // Try sending with input ID format
+          JFCustomWidget.sendData({
+            "input_45": materialCode
+          });
+          
+          // Also try with the Unique Name format
           JFCustomWidget.sendData({
             "typeA45": materialCode
           });
           
-          console.log("Sending to field with Unique Name 'typeA45': " + materialCode);
+          console.log("Sending value to both formats: " + materialCode);
         } else {
           // If unchecked, clear the field
           JFCustomWidget.sendData({
+            "input_45": "",
             "typeA45": ""
           });
         }
@@ -405,15 +411,23 @@
         // Join all selected codes with commas
         var combinedValue = selectedCodes.join(", ");
         
-        // Send to the field with Unique Name "typeA45"
+        // Try both formats to cover all bases
         if (selectedCodes.length > 0) {
+          // Send to input_45 (Input ID format)
+          JFCustomWidget.sendData({
+            "input_45": combinedValue
+          });
+          
+          // And also to typeA45 (Unique Name format)
           JFCustomWidget.sendData({
             "typeA45": combinedValue
           });
-          console.log("Sending combined values to field with Unique Name 'typeA45': " + combinedValue);
+          
+          console.log("Sending combined values to both formats: " + combinedValue);
         } else {
-          // Clear the field if nothing is selected
+          // Clear the fields if nothing is selected
           JFCustomWidget.sendData({
+            "input_45": "",
             "typeA45": ""
           });
         }
