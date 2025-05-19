@@ -158,6 +158,12 @@
       <div id="visual-table-area" style="display: none;">
         <!-- This will contain a HTML table that mimics a chart -->
       </div>
+
+      <!-- Debug area to show which values are being passed -->
+      <div id="debug-area" style="margin-top: 20px; padding: 10px; background-color: #f0f0f0; display: none;">
+        <h4>Values Being Passed to Other Questions:</h4>
+        <pre id="debug-values"></pre>
+      </div>
     </div>
     
     <script>
@@ -173,6 +179,46 @@
       
       // Store values in the dynamic table (3D object: row > column > checked state)
       var tableValues = {};
+      
+      // Hard-coded values to pass to other questions in the form
+      // Format: {location: {material: valueToPass}}
+      var hardCodedValues = {
+        "Home": {
+          "Asphalt": "HA-100",
+          "Metal": "HM-250",
+          "Tile": "HT-350"
+        },
+        "Barn": {
+          "Asphalt": "BA-150",
+          "Metal": "BM-300",
+          "Tile": "BT-400"
+        },
+        "Garage": {
+          "Asphalt": "GA-200",
+          "Metal": "GM-450",
+          "Tile": "GT-500"
+        }
+      };
+      
+      // Target question IDs to pass values to
+      // These should be the actual question IDs in your JotForm
+      var targetQuestionIDs = {
+        "Home": {
+          "Asphalt": "input_45",
+          "Metal": "input_11",
+          "Tile": "input_12"
+        },
+        "Barn": {
+          "Asphalt": "input_13",
+          "Metal": "input_14",
+          "Tile": "input_15"
+        },
+        "Garage": {
+          "Asphalt": "input_16",
+          "Metal": "input_17",
+          "Tile": "input_18"
+        }
+      };
       
       // Initialize table values
       function initTableValues() {
@@ -243,6 +289,9 @@
         
         // Update the visual table (renders as HTML instead of canvas for better PDF export)
         updateVisualTable(selectedOptions);
+        
+        // Update values passed to other questions
+        updatePassedValues();
       }
       
       // Create a visual table that will render well in PDFs
@@ -288,6 +337,75 @@
         
         // Update the table display
         updateDynamicTable();
+        
+        // Pass value to specified question in the form
+        passValueToQuestion(row, option);
+      }
+      
+      // Pass a value to another question in the form based on checkbox state
+      function passValueToQuestion(row, option) {
+        var isChecked = tableValues[row][option] === 1;
+        var valueToPass = isChecked ? hardCodedValues[row][option] : "";
+        var targetQuestionID = targetQuestionIDs[row][option];
+        
+        // Use JotForm API to pass the value
+        if (targetQuestionID) {
+          JFCustomWidget.sendData({
+            [targetQuestionID]: valueToPass
+          });
+          
+          // For debugging - display the values being passed
+          updateDebugDisplay();
+        }
+      }
+      
+      // Update all passed values based on current table state
+      function updatePassedValues() {
+        var dataToSend = {};
+        
+        // Iterate through all cells and set values for checked ones
+        tableRows.forEach(function(row) {
+          for (var option in checkboxState) {
+            if (checkboxState[option] === 1 && tableValues[row][option] === 1) {
+              var targetQuestionID = targetQuestionIDs[row][option];
+              if (targetQuestionID) {
+                dataToSend[targetQuestionID] = hardCodedValues[row][option];
+              }
+            }
+          }
+        });
+        
+        // Send all values at once
+        if (Object.keys(dataToSend).length > 0) {
+          JFCustomWidget.sendData(dataToSend);
+        }
+        
+        // Update debug display
+        updateDebugDisplay();
+      }
+      
+      // Update debug display to show which values are being passed
+      function updateDebugDisplay() {
+        var debugArea = document.getElementById("debug-area");
+        var debugValues = document.getElementById("debug-values");
+        var debugText = "";
+        
+        // Display values being passed
+        tableRows.forEach(function(row) {
+          debugText += row + ":\n";
+          for (var option in checkboxState) {
+            if (checkboxState[option] === 1) {
+              var isChecked = tableValues[row][option] === 1;
+              var value = isChecked ? hardCodedValues[row][option] : "None";
+              var targetID = targetQuestionIDs[row][option];
+              debugText += "  - " + option + ": " + value + " -> " + targetID + "\n";
+            }
+          }
+        });
+        
+        // Show debug area and update text
+        debugArea.style.display = "block";
+        debugValues.textContent = debugText;
       }
       
       // Handle checkbox changes - toggle state when event is received
@@ -339,8 +457,9 @@
             var cellColor = isChecked ? '#e6ffe6' : '#fff0f0';
             var textColor = isChecked ? '#006600' : '#cc0000';
             var value = isChecked ? "YES" : "NO";
+            var hardCodedValue = isChecked ? " (" + hardCodedValues[row][option] + ")" : "";
             
-            htmlOutput += '<td style="background-color: ' + cellColor + '; color: ' + textColor + '; text-align: center;"><strong>' + value + '</strong></td>';
+            htmlOutput += '<td style="background-color: ' + cellColor + '; color: ' + textColor + '; text-align: center;"><strong>' + value + hardCodedValue + '</strong></td>';
           });
           
           htmlOutput += '</tr>';
